@@ -1,0 +1,17 @@
+{
+    "name": "books",
+    "tuples_limit": 3,
+    "structure": {
+        "books": [
+            "shop_id",
+            "section",
+            "author",
+            "title",
+            "publisher",
+            "publishing_year",
+            "page_count",
+            "price",
+            "additional_info"
+        ]
+    }
+}
