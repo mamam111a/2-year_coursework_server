@@ -10,7 +10,7 @@ string HashingFunc(const string& login, const string& password) {
 
 void SaveLoginPasswordToFile(const string& login, const string& password) {
     string hashedValue = HashingFunc(login, password);
-    ofstream outFile("./authorization/authorization.bin", ios::binary | ios::app);
+    ofstream outFile("authorization/authorization.bin", ios::binary | ios::app);
     if (outFile.is_open()) {
         int length = hashedValue.length();
         outFile.write(reinterpret_cast<char*>(&length), sizeof(length)); 
@@ -22,7 +22,7 @@ void SaveLoginPasswordToFile(const string& login, const string& password) {
     }
 }
 bool ReadFromFile(const string& targetHash) {
-    ifstream inFile("./authorization/authorization.bin",  ios::binary);
+    ifstream inFile("authorization/authorization.bin",  ios::binary);
     if (inFile.is_open()) {
         while (!inFile.eof()) {
             int length;
@@ -41,6 +41,7 @@ bool ReadFromFile(const string& targetHash) {
         cout << endl << "Ошибка открытия файла для чтения!" << endl;
     }
 }
+
 bool CheckAuthorization(const string& login, const string& password) {
     string targetHash = HashingFunc(login, password);
     return(ReadFromFile(targetHash));

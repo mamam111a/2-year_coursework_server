@@ -1,7 +1,6 @@
 #include <iostream>
-using json = nlohmann::json;
 using namespace std;
-
+using json = nlohmann::json;
 
 json ReadSchema(const string& filepath) {
     ifstream inFile(filepath);
@@ -14,15 +13,15 @@ json ReadSchema(const string& filepath) {
     inFile >> jsonData;
     return jsonData;
 }
-void CreatePkSequence(const string& filename) {
+void CreateLastLine(const string& filename) {
     string name = filename.substr(0, 5);
-    ofstream outFile("./" + name + "/" + filename + "_pk_sequence.csv");
+    ofstream outFile(name + "/" + name + "_last_Line.txt");
     outFile << "0";
     outFile.close();
 }
 void CreateListCSV(const string& filename) {
     string name = filename.substr(0, 5);
-    ofstream outFile("./" + name + "/" + name + "_list_CSV.csv");
+    ofstream outFile(name + "/" + name + "_list_CSV.txt");
     outFile << "1";
     outFile.close();
 }
@@ -39,21 +38,9 @@ void CreateTableFromJson(const string& filepath) {
     string tableName = jsonData["name"];
     tableName += "_1";
     string name = jsonData["name"];
-    if (FileExist("./" + name + "/" + tableName + ".csv")) return;
-
-    auto structure = jsonData["structure"];
-    string columnKey = structure.begin().key();
-
-    vector<string> columns = structure[columnKey];
-    ofstream outFile("./" + name + "/" + tableName + ".csv");
-    outFile << tableName + "_pk;";
-    for (int i = 0; i < columns.size(); i++) {
-        outFile << columns[i];
-        if (i != columns.size() - 1) outFile << ";";
-    }
-    outFile << endl;
+    if (FileExist(name + "/" + tableName + ".csv")) return;
+    ofstream outFile(name + "/" + tableName + ".csv");
     outFile.close();
-
-    CreatePkSequence(tableName);
+    CreateLastLine(tableName);
     CreateListCSV(tableName);
 }
