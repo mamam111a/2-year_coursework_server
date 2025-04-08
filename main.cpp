@@ -11,7 +11,18 @@
 using json = nlohmann::json;
 using namespace std;
 
-
+void printConditionList(Condition* head) {
+    Condition* current = head;
+    int index = 1;
+    while (current != nullptr) {
+        cout << "Condition #" << index++ << ":\n";
+        cout << "  trueOrFalse: " << (current->trueOrFalse ? "true" : "false") << '\n';
+        cout << "  condition: " << current->condition << '\n';
+        cout << "  operator: " << current->oper << '\n';
+        cout << "---------------------------\n";
+        current = current->next;
+    }
+}
 int main() {
     int temp = 0;
     cout << endl << "Авторизация - 1" << endl << "Регистрация 2" << endl;
@@ -81,5 +92,11 @@ int main() {
     tableShops.InsertLastRow(v91);
     tableShops.InsertLastRow(v101);
 */
+        
+    string tempstr = "books.section = 'Фантастика' OR books.section = 'Фэнтези' AND books.author = 'Александр Пушкин'";
+    Condition* newcond = SplitExpressionForStruct(tempstr);
+    Condition* condnahuy = ReplacingConditionsWithBool(newcond);
+    printConditionList(condnahuy);
+
 
 }

@@ -31,7 +31,7 @@ public:
         lastCSV = FindLastCSV();
         tupleLimit = jsonData["tuples_limit"];
     };
-   int GetIndex(const string& str) {
+   int GetRowID(const string& str) {
         int pos = str.find(';'); 
         string temp = str.substr(0, pos);
         return stoi(temp);    
@@ -55,7 +55,7 @@ public:
                 lastRow = temp;
             }
             inFile.close();
-            newIndex = GetIndex(lastRow) + 1;
+            newIndex = GetRowID(lastRow) + 1;
         }
 
         ofstream outFile(currFilepath, ios::app);
@@ -97,7 +97,7 @@ public:
         }
         string currLine;
         string prevLine;
-        string tempFilepath = currFilepath + ".tmp";
+        string tempFilepath = "DeleteLastRow.tmp";
         ifstream inFile(currFilepath);
         ofstream tempFile(tempFilepath);
     
@@ -111,6 +111,7 @@ public:
         }
         inFile.close();
         tempFile.close();
+
         filesystem::remove(currFilepath);
         filesystem::rename(tempFilepath, currFilepath);
     
@@ -120,7 +121,6 @@ public:
         pkFile.close();
         return 1;
     }
-    
 
 
 };
