@@ -2,21 +2,15 @@
 #include <functional>
 #include <sstream>
 #include <fstream>
+#include <dirent.h>
 #include <vector>
 #include "json.hpp"
 #include "authorization.h"
 #include "workingCSV.h"
 #include "crud.h"
 #include "condition.h"
-#include "print.h"
 using json = nlohmann::json;
 using namespace std;
-
-
-
-
-
-
 
 
 int main() {
@@ -52,7 +46,7 @@ int main() {
     vector<string> v6 = {"2", "Фантастика", "Фёдор Достоевский", "Преступление и наказание", "Издательство А", "2018", "500", "30", "С повреждениями"};
     vector<string> v7 = {"8", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Б", "2002", "500", "30", "Как новая"};
     vector<string> v8 = {"1", "Нон-фикшн", "Лев Толстой", "Война и мир", "Издательство В", "2002", "100", "50", "Бестселлер"};
-    vector<string> v9 = {"10", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Д", "2019", "400", "10", "Хорошее состояние"};
+   
     vector<string> v10 = {"3", "Фантастика", "Александр Пушкин", "Евгений Онегин", "Издательство А", "2007", "100", "30", "Как новая"};
 
     tableBooks.InsertLastRow(v1);
@@ -89,11 +83,10 @@ int main() {
     tableShops.InsertLastRow(v101);
 */
 
-    string tempstr = "books.shop_id = shops.shop_id AND books.author = books.title";
-    Condition* newcond = SplitExpressionForStruct(tempstr);
-    Condition* condnahuy = ReplacingConditionsWithBool(newcond);
-    //printConditionList(condnahuy);
-    Filtering(condnahuy);
-    //printConditionList(condnahuy);
+    vector<string> v9 = {"10", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Д", "2019", "400", "10", "Хорошее состояние"};
+    tableBooks.InsertLastRow(v9);
+    string tempstr = "books.author = 'Антон Чехов'";
+    
+    //FindByCriteria(tempstr);
     
 }

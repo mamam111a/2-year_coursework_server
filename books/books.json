@@ -9,7 +9,7 @@
             "title",
             "publisher",
             "publishing_year",
-            "page_count",
+            "quantity",
             "price",
             "additional_info"
         ]

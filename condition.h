@@ -11,6 +11,34 @@ struct Condition {
     Condition* next;
 };
 
+void PrintFinalFile() {
+    ifstream file("finalFile.tmp");
+    string line;
+    cout << endl << endl;
+    while(getline(file,line)) {
+        cout << line << endl;
+    }
+    cout << endl << endl;
+    file.close();
+}
+void DeleteTmpInDirectory(const string& path) {
+    DIR* dir;
+    struct dirent* entry;
+    int deleted = 0;
+
+    dir = opendir(path.c_str());
+    while ((entry = readdir(dir)) != nullptr) {
+        string filename = entry->d_name;
+        if (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".tmp") {
+            string fullPath = path + "/" + filename;
+            if (remove(fullPath.c_str()) == 0) {
+                deleted++;
+            }
+        }   
+
+    }
+    closedir(dir);
+}
 void RemoveConditionByIndex(Condition*& head, int index) {
     Condition* curr = head;
     Condition* prev = nullptr;
@@ -386,7 +414,8 @@ bool HasDoubles (vector<string> & doubles, string& row) {
     return true;
     
 }
-bool Filtering(Condition* condition) {
+
+bool FilteringForOneFile(Condition* condition) {
     vector<string> doubles;
     string result;
     Condition* tempHead = condition;
@@ -422,7 +451,10 @@ bool Filtering(Condition* condition) {
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp");
                 string temp;
                 while(getline(cartezianFile, temp)) {
-                    if(HasDoubles(doubles,temp) == false) finalCartezianFile << temp << endl;
+                    if(HasDoubles(doubles,temp) == false) {
+                        finalCartezianFile << temp << endl;
+                        fullness = true;
+                    }
                 }
                 finalCartezianFile.close();
                 cartezianFile.close();
@@ -460,7 +492,10 @@ bool Filtering(Condition* condition) {
                         string tempB1;
                         tempB1 = GetCellByIndex(tempB, targetColumnOrdinary);
                         if(tempB1 == cellA) {
-                            if(HasDoubles(doubles,tempA) == false) finalCartezianFile << tempA << endl;
+                            if(HasDoubles(doubles,tempA) == false) {
+                                finalCartezianFile << tempA << endl;
+                                fullness = true;
+                            }
                         } 
                     }
                 }
@@ -475,6 +510,7 @@ bool Filtering(Condition* condition) {
                 string temp;
                 while(getline(cartezianFile, temp)) {
                     finalFile << temp << endl;
+                    fullness = true;
                 }
                 cartezianFile.close();
                 finalFile.close();
@@ -507,8 +543,10 @@ bool Filtering(Condition* condition) {
                     while (getline(ordinaryFile, tempOrdinary)) {
                         string cellFromOrdinary = GetCellByIndex(tempOrdinary, targetColumnOrdinary);
                         if (cellFromOrdinary == cellFromCartesian) {
-                            if (!HasDoubles(doubles, tempCartesian))
+                            if (!HasDoubles(doubles, tempCartesian)) {
                                 finalCartezianFile << tempCartesian << endl;
+                                fullness = true;
+                            }
                         }
                     }
                     ordinaryFile.clear();
@@ -602,7 +640,10 @@ bool Filtering(Condition* condition) {
             if(tempHead->trueOrFalse == 1) {
                 string temp;
                 while(getline(conditionFileA,temp)) {
-                    if(HasDoubles(doubles,temp) == false) finalFile << temp << endl;
+                    if(HasDoubles(doubles,temp) == false) {
+                        finalFile << temp << endl;
+                        fullness = true;
+                    }
                 }
             }
             finalFile.close();
@@ -618,4 +659,21 @@ bool Filtering(Condition* condition) {
         
     }
     return fullness; //ЧТОБЫ ВЫВЕСТИ ЧТО ФАЙЛ ПУСТОЙ
+}
+
+bool FindByCriteria(string expression) {
+    bool fullness;
+    Condition* condition = SplitExpressionForStruct(expression);
+    Condition* newCondition = ReplacingConditionsWithBool(condition);
+    if(FilteringForOneFile(newCondition)) {
+        fullness = true;
+    }
+    else {
+        fullness = false;
+    }
+    PrintFinalFile();
+    DeleteTmpInDirectory(".");         
+    DeleteTmpInDirectory("books"); 
+    DeleteTmpInDirectory("shops"); 
+    return fullness;
 }
