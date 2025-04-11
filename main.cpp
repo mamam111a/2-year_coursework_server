@@ -8,8 +8,15 @@
 #include "workingCSV.h"
 #include "crud.h"
 #include "condition.h"
+#include "print.h"
 using json = nlohmann::json;
 using namespace std;
+
+
+
+
+
+
 
 
 int main() {
@@ -81,8 +88,8 @@ int main() {
     tableShops.InsertLastRow(v91);
     tableShops.InsertLastRow(v101);
 */
-        
-    string tempstr = "books.author = books.title OR books.author = books.publisher AND books.publishing_year = books.additional_info";
+
+    string tempstr = "books.shop_id = shops.shop_id AND books.author = books.title";
     Condition* newcond = SplitExpressionForStruct(tempstr);
     Condition* condnahuy = ReplacingConditionsWithBool(newcond);
     //printConditionList(condnahuy);

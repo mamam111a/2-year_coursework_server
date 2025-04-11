@@ -11,18 +11,6 @@ struct Condition {
     Condition* next;
 };
 
-void printConditionList(Condition* head) {
-    Condition* current = head;
-    int index = 1;
-    while (current != nullptr) {
-        cout << "Condition #" << index++ << ":\n";
-        cout << "  trueOrFalse: " << (current->trueOrFalse ? "true" : "false") << '\n';
-        cout << "  condition: " << current->condition << '\n';
-        cout << "  operator: " << current->oper << '\n';
-        cout << "---------------------------\n";
-        current = current->next;
-    }
-}
 void RemoveConditionByIndex(Condition*& head, int index) {
     Condition* curr = head;
     Condition* prev = nullptr;
@@ -42,16 +30,19 @@ void RemoveConditionByIndex(Condition*& head, int index) {
     prev->next = curr->next;
     delete curr;
 }
-/*
-int CountConditions(Condition* head) {
+string GetCellByIndex(const string& row, int index) {
+    stringstream ss(row);
+    string cell;
     int count = 0;
-    Condition* current = head;
-    while (current != nullptr) {
+    while (getline(ss, cell, ';')) {
+        if (count == index) {
+            return cell;  
+        }
         count++;
-        current = current->next;
     }
-    return count;
-}*/
+    return "";  
+}
+
 string CleanString(const string& str) {
     int first = str.find_first_not_of(" \t\n\r");
     int last = str.find_last_not_of(" \t\n\r");
@@ -121,84 +112,60 @@ int GetColumnIndex(json& schema, string& nameTable, string& nameColumn) {
     }
     return -1;
 }
-bool SelectFromOneTable(vector<string> &parameters, const string &tempName, const int& tempNumber) {
+
+bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount) {
     bool isFound = false;
-    string nameTable = parameters[0];
-    string nameColumn = parameters[1];
+    vector<string> parametersA = {parameters[0], parameters[1]};
+    vector<string> parametersB = {parameters[2], parameters[3]};
 
-    int lastCSV;
-    ifstream csvFile(nameTable + "/" + nameTable + "_list_CSV.txt");
-    csvFile >> lastCSV;
-    csvFile.close();
-
-    json schema = ReadSchema(nameTable + "/" + nameTable + ".json");
-    ofstream tmpFile(nameTable + "/" + tempName + "_" + to_string(tempNumber) + ".tmp", ios::app);
-
-    for(int i = 1; i <= lastCSV; i++) {
-        ifstream inFile(nameTable + "/" + nameTable + "_" + to_string(i) + ".csv");
-        string temp;
-        while (getline(inFile, temp)) {
-            int targetColumn = GetColumnIndex(schema, nameTable, nameColumn);
-            if(targetColumn == -1) return false;
-            stringstream ss(temp);
-            string value;
-            int j = 0;
-
-            while (getline(ss, value, ';')) {
-                if (j == targetColumn) {
-                    tmpFile << temp << endl;
-                    isFound = true;
-                    break;
-                }
-                j++;
-            }
-        }
-        inFile.close();
-    }
-    tmpFile.close(); //НУЖНО УДАЛИТЬ
-    return isFound;
-}
-bool SelectFromManyTables (vector<string> &parameters) {
-    bool isFound = false;
-    if(parameters.size() == 2) {
-        SelectFromOneTable(parameters, "SelectFrom", 1);
-        //вывод + УДАЛЕНИЕ ТЕМПА
+    string nameTableA, targetColumnA;
+    string nameTableB, targetColumnB;
+    if(parameters[0] == "books") {
+        nameTableA = "books"; targetColumnA = parameters[1];
+        nameTableB = "shops"; targetColumnB = parameters[3];
     }
     else {
-        vector<string> parametersA = {parameters[0], parameters[1]};
-        vector<string> parametersB = {parameters[2], parameters[3]};
-        SelectFromOneTable(parametersA, "SelectFromCartezian", 1);
-        SelectFromOneTable(parametersB, "SelectFromCartezian", 2);
-        ifstream inFileA(parameters[0] + "/" + "SelectFromCartezian_1.tmp");
-        ifstream inFileB(parameters[2] + "/" + "SelectFromCartezian_2.tmp");
-        ofstream inFileCartezian("SelectFromCartezian.tmp",ios::app);
-        string tempA;
-        string tempB;
-        
-        if(parameters[0] == "books") {
-            while (getline(inFileA, tempA)) {
-                inFileB.clear();
-                inFileB.seekg(0); 
-                while (getline(inFileB, tempB)) {
-                    inFileCartezian << tempA << ";" << tempB << endl;
-                }
-            }
-        }
-        else {
-            while (getline(inFileB, tempB)) {
-                inFileA.clear();
-                inFileA.seekg(0); 
-                while (getline(inFileA, tempA)) {
-                    inFileCartezian << tempB << ";" << tempA<< endl;
-                }
-            }
-        }
-        //вывод + УДАЛЕНИЕ ТЕМПА
-        inFileA.close();
-        inFileB.close();
-        inFileCartezian.close();
-
+        nameTableB = "books"; targetColumnB = parameters[1];
+        nameTableA = "shops"; targetColumnA = parameters[3];
     }
+    json jsonDataBooks = ReadSchema(nameTableA + "/" + nameTableA + ".json");
+    json jsonDataShops = ReadSchema(nameTableB + "/" + nameTableB + ".json");
+    ofstream finalFileCartesian("SelectFromCartesian_" + to_string(tmpFileCount) + ".tmp", ios::app);
+    int lastCSVBooks;
+    ifstream csvFile(nameTableA + "/" + nameTableA + "_list_CSV.txt");
+    csvFile >> lastCSVBooks;
+    csvFile.close();
+
+    int lastCSVShops;
+    ifstream csvFile1(nameTableB + "/" + nameTableB + "_list_CSV.txt");
+    csvFile1 >> lastCSVShops;
+    csvFile1.close();
+
+    for(int i = 1; i <= lastCSVBooks; i++) {
+        string rowBooks;
+        ifstream fileBooks(nameTableA + "/" + nameTableA + "_" + to_string(i) + ".csv");
+        while(getline(fileBooks, rowBooks)) {
+            int columnBooks = GetColumnIndex(jsonDataBooks, nameTableA, targetColumnA);
+            string cellBooks = GetCellByIndex(rowBooks, columnBooks);
+            for(int j = 1; j <= lastCSVShops; j++) {
+                ifstream fileShops(nameTableB + "/" + nameTableB + "_" + to_string(j) + ".csv");
+                string rowShops;
+                while(getline(fileShops, rowShops)) {
+                
+                    int columnShops = GetColumnIndex(jsonDataShops, nameTableB, targetColumnB);
+                    string cellShops = GetCellByIndex(rowShops, columnShops);
+
+                    if(cellBooks == cellShops) {
+                        finalFileCartesian << rowBooks << ";" << rowShops << endl;
+                        isFound = true;
+
+                    }
+                }
+            }
+        }
+    };
+
+    finalFileCartesian.close();
     return isFound;
 }
 bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian) {
@@ -249,7 +216,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
         string nameTableB = parameters[2];
         string nameColumnB = parameters[3];
 
-        if(nameTableA == nameTableB ) {
+        if(nameTableA == nameTableB ) { //данные из одной таблицы, ПРИРАВНИВАНИЕ
             int lastCSV;
             ifstream csvFile(nameTableA + "/" + nameTableA + "_list_CSV.txt");
             csvFile >> lastCSV;
@@ -293,27 +260,9 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
             }
             tmpFile.close();//НУЖНО УДАЛИТЬ
         }
-        else {
+        else { //ДАННЫЕ ИЗ РАЗНЫХ ТАБЛИЦ
             hasCartezian = true;
-           SelectFromManyTables(parameters);
-           ifstream inFile("SelectFromCartezian.tmp");
-           ofstream outFile("SelectFromCartezianGETIT_" + to_string(tmpFileCount) + ".tmp", ios::app);
-           string temp;
-           stringstream ss(temp);
-           string value;
-
-           while(getline(inFile,temp)) {
-            int pos = temp.find(';');
-            string partA = temp.substr(0, pos);
-            string partB = temp.substr(pos + 1);
-                if(partA == partB) {
-                    outFile << temp << endl;
-                }
-           }
-           outFile.close();//ВЫВЕСТИ И УДАЛИТЬ
-           inFile.close();
-
-           //filesystem::remove("SelectFromCartezianGETIT.tmp");
+            if(SelectFromManyTables(parameters, tmpFileCount)) isFound = true;
         }
     }
     return isFound;
@@ -416,18 +365,7 @@ Condition* ConstFindConditionOper(const Condition* head, const string& oper) {
     return nullptr; 
 }
 
-string GetCellByIndex(const string& row, int index) {
-    stringstream ss(row);
-    string cell;
-    int count = 0;
-    while (getline(ss, cell, ';')) {
-        if (count == index) {
-            return cell;  
-        }
-        count++;
-    }
-    return "";  
-}
+
 int GetSizeCondition(Condition* head) {
     int size = 0;
     Condition* current = head;
@@ -480,8 +418,8 @@ bool Filtering(Condition* condition) {
         if(tempHead->isCartesian) {
             if(tempHead->oper == "OR" && tempHead->trueOrFalse == 1) {
                 int indexCondition = tempHead->index;
-                ofstream finalCartezianFile("finalCartesianFile.tmp");
-                ifstream cartezianFile("SelectFromCartezianGETIT_" + to_string(indexCondition)+ ".tmp");
+                ofstream finalCartezianFile("finalFile.tmp");
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp");
                 string temp;
                 while(getline(cartezianFile, temp)) {
                     if(HasDoubles(doubles,temp) == false) finalCartezianFile << temp << endl;
@@ -499,11 +437,11 @@ bool Filtering(Condition* condition) {
                 int targetPartCartesian;
                 if(condition.substr(0,5) == "books") targetPartCartesian = 1;
                 else targetPartCartesian = 2;
-                ofstream finalCartezianFile("finalCartesianFile.tmp");
+                ofstream finalCartezianFile("finalFile.tmp");
 
                 int indexConditionA = tempHead->index;
                 int indexConditionB = tempHead->next->index;
-                ifstream cartezianFile("SelectFromCartezianGETIT_" + to_string(indexConditionA)+ ".tmp"); 
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionA)+ ".tmp"); 
                 ifstream ordinaryFile(nameTable + "/" + "CheckCondition_" + to_string(indexConditionB)+ ".tmp"); 
                 int targetColumnOrdinary = tempHead->targetColumns[0];
                 int targetColumnCartesian;
@@ -530,8 +468,56 @@ bool Filtering(Condition* condition) {
                 ordinaryFile.close();
                 finalCartezianFile.close();
             }
+            else if (tempHead->oper == ""){
+                int indexCondition = tempHead->index;
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp"); 
+                ofstream finalFile("finalFile.tmp", ios::app);
+                string temp;
+                while(getline(cartezianFile, temp)) {
+                    finalFile << temp << endl;
+                }
+                cartezianFile.close();
+                finalFile.close();
+            }
         }
         else if(tempHead->oper == "AND" || ConstFindConditionOper(tempHead, "AND") != nullptr) {
+            if(tempHead->next->isCartesian == true) {
+                string condition = tempHead->condition;
+                string nameTable;
+                if (condition.substr(0, 5) == "books") nameTable = "books";
+                else nameTable = "shops";
+
+                int targetPartCartesian = (nameTable == "books") ? 1 : 2;
+                ofstream finalCartezianFile("finalFile.tmp");
+                int indexConditionOrdinary = tempHead->index;
+                int indexConditionCartesian = tempHead->next->index;
+                ifstream ordinaryFile(nameTable + "/CheckCondition_" + to_string(indexConditionOrdinary) + ".tmp");
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionCartesian) + ".tmp");
+                int targetColumnOrdinary = tempHead->targetColumns[0];
+                string tempCartesian;
+
+                while (getline(cartezianFile, tempCartesian)) {
+                    string cellFromCartesian;
+                    if (targetPartCartesian == 1) {
+                        cellFromCartesian = GetCellByIndex(tempCartesian, targetColumnOrdinary);
+                    } else {
+                        cellFromCartesian = GetCellByIndex(tempCartesian, targetColumnOrdinary + 9); 
+                    }
+                    string tempOrdinary;
+                    while (getline(ordinaryFile, tempOrdinary)) {
+                        string cellFromOrdinary = GetCellByIndex(tempOrdinary, targetColumnOrdinary);
+                        if (cellFromOrdinary == cellFromCartesian) {
+                            if (!HasDoubles(doubles, tempCartesian))
+                                finalCartezianFile << tempCartesian << endl;
+                        }
+                    }
+                    ordinaryFile.clear();
+                    ordinaryFile.seekg(0);
+                }
+                cartezianFile.close();
+                ordinaryFile.close();
+                finalCartezianFile.close();
+            }
             Condition* head = tempHead;
             tempHead = FindConditionOper(tempHead, "AND");
             string condition = tempHead->condition;
@@ -573,7 +559,7 @@ bool Filtering(Condition* condition) {
             }
             else {
                 string tempA;
-                while(getline(conditionFileA,tempA)) { //КОРОЧЕ ТУТ ПРОБЛЕМА
+                while(getline(conditionFileA,tempA)) { 
                     string tempB;
                     getline(conditionFileB,tempB);
                     stringstream ss(tempA);
@@ -581,14 +567,15 @@ bool Filtering(Condition* condition) {
                     int countColumns = 1;
                     int countPairs = 0;
                     while(getline(ss,cell, ';')) {
+                        if(countPairs == 2) {
+                            if(HasDoubles(doubles,tempA) == false) finalFile << tempA << endl;
+                            fullness = true;
+                            break; //??????
+                        }
                         countColumns++;
-                        if(countColumns == targetColumnB) {
+                        if(countColumns == targetColumnB1 || countColumns == targetColumnB2) {
                             countPairs++;
                         }
-                    }
-                    if(countPairs == 2) {
-                        if(HasDoubles(doubles,tempA) == false) finalFile << tempA << endl;
-                        fullness = true;
                     }
                 }
             }
@@ -625,9 +612,10 @@ bool Filtering(Condition* condition) {
             countConditions = countConditions - 1;
 
         }
+        if(countConditions == 0) return fullness;
         if(countConditions == 1 && tempHead->oper == "") tempHead = tempHead->next;
-        if(countConditions != 1 ) tempHead = tempHead->next;
+        if(countConditions != 1) tempHead = tempHead->next;
         
     }
-    return fullness;
+    return fullness; //ЧТОБЫ ВЫВЕСТИ ЧТО ФАЙЛ ПУСТОЙ
 }
