@@ -121,6 +121,9 @@ public:
         pkFile.close();
         return 1;
     }
-
+    bool DeleteForCriteria(string criteria) {
+        FindByCriteria(criteria); //ОБРАБОТАТЬ СЛУЧАЙ - нельзя картезиан
+        
+    }
 
 };

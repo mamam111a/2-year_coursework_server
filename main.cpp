@@ -4,6 +4,7 @@
 #include <fstream>
 #include <dirent.h>
 #include <vector>
+#include <set>
 #include "json.hpp"
 #include "authorization.h"
 #include "workingCSV.h"
@@ -46,6 +47,7 @@ int main() {
     vector<string> v6 = {"2", "Фантастика", "Фёдор Достоевский", "Преступление и наказание", "Издательство А", "2018", "500", "30", "С повреждениями"};
     vector<string> v7 = {"8", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Б", "2002", "500", "30", "Как новая"};
     vector<string> v8 = {"1", "Нон-фикшн", "Лев Толстой", "Война и мир", "Издательство В", "2002", "100", "50", "Бестселлер"};
+    vector<string> v9 = {"1", "Нон-фикшн", "Лев Толстой", "Война и лол", "Издательство В", "2002", "100", "50", "Бестселлер"};
    
     vector<string> v10 = {"3", "Фантастика", "Александр Пушкин", "Евгений Онегин", "Издательство А", "2007", "100", "30", "Как новая"};
 
@@ -82,11 +84,7 @@ int main() {
     tableShops.InsertLastRow(v91);
     tableShops.InsertLastRow(v101);
 */
+    //string tempstrA = "shops.name = 'Магазин 1' AND shops.name = 'парапр'";
+    //FindByCriteria(tempstrA);
 
-    vector<string> v9 = {"10", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Д", "2019", "400", "10", "Хорошее состояние"};
-    tableBooks.InsertLastRow(v9);
-    string tempstr = "books.author = 'Антон Чехов'";
-    
-    //FindByCriteria(tempstr);
-    
 }

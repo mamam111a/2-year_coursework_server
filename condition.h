@@ -236,7 +236,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
             }
             inFile.close();
         }
-        tmpFile.close(); //НУЖНО УДАЛИТЬ
+        tmpFile.close(); 
     }
     else {
         string nameTableA = parameters[0];
@@ -244,7 +244,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
         string nameTableB = parameters[2];
         string nameColumnB = parameters[3];
 
-        if(nameTableA == nameTableB ) { //данные из одной таблицы, ПРИРАВНИВАНИЕ
+        if(nameTableA == nameTableB ) { 
             int lastCSV;
             ifstream csvFile(nameTableA + "/" + nameTableA + "_list_CSV.txt");
             csvFile >> lastCSV;
@@ -271,7 +271,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
                             if(targetA == targetB) {
                                 tmpFile << temp << endl;
                                 isFound = true;
-                                break; //???
+                                break; 
                             }
                             else {
                                 break;
@@ -286,9 +286,9 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
                 }
                 inFile.close();
             }
-            tmpFile.close();//НУЖНО УДАЛИТЬ
+            tmpFile.close();
         }
-        else { //ДАННЫЕ ИЗ РАЗНЫХ ТАБЛИЦ
+        else { 
             hasCartezian = true;
             if(SelectFromManyTables(parameters, tmpFileCount)) isFound = true;
         }
@@ -322,7 +322,6 @@ Condition* ReplacingConditionsWithBool(Condition* expressions) {
             target = CleanString(target);
 
             vector<string> parameters = {nameTable, nameColumn, target};
-            //int countConditions = CountConditions(head);
             json jsonData = ReadSchema(nameTable + "/" + nameTable + ".json");
             int indexTargetColumn = GetColumnIndex(jsonData,nameTable,nameColumn);
             bool isCartezian = false;
@@ -348,7 +347,6 @@ Condition* ReplacingConditionsWithBool(Condition* expressions) {
             nameTableB = CleanString(nameTableB);
             nameColumnB = CleanString(nameColumnB);
             vector<string> parameters = {nameTableA, nameColumnA, nameTableB, nameColumnB};
-            //int countConditions = CountConditions(head);
             json jsonDataA = ReadSchema(nameTableA + "/" + nameTableA + ".json");
             json jsonDataB = ReadSchema(nameTableB + "/" + nameTableB + ".json");
             int indexTargetColumnA = GetColumnIndex(jsonDataA,nameTableA,nameColumnA);
@@ -403,20 +401,20 @@ int GetSizeCondition(Condition* head) {
     }
     return size;
 }
-bool HasDoubles (vector<string> & doubles, string& row) {
-    stringstream ss(row);
-    string id;
-    getline(ss,id,';');
-    if (find(doubles.begin(), doubles.end(), id) == doubles.end()) {
-        doubles.push_back(id);
-        return false;
+bool isLineInFile(const std::string& filename, const std::string& lineToCheck) {
+    ifstream file(filename); 
+    string currentLine;
+    while (getline(file, currentLine)) {
+        if (currentLine == lineToCheck) {
+            file.close(); 
+            return true;
+        }
     }
-    return true;
-    
+    file.close(); 
+    return false; 
 }
 
 bool FilteringForOneFile(Condition* condition) {
-    vector<string> doubles;
     string result;
     Condition* tempHead = condition;
     bool fullness = false;
@@ -439,42 +437,42 @@ bool FilteringForOneFile(Condition* condition) {
         condition = condition->next;
     }
     Condition* newTempHead = tempHead;
-    //map<int, int> trueANDtrue;
-    //ofstream outFile("finalFile.tmp");
     int countConditions = GetSizeCondition(tempHead);
 
     while(tempHead != nullptr) {
         if(tempHead->isCartesian) {
             if(tempHead->oper == "OR" && tempHead->trueOrFalse == 1) {
                 int indexCondition = tempHead->index;
-                ofstream finalCartezianFile("finalFile.tmp");
+                ofstream finalCartezianFile("finalFile.tmp", ios::app);
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp");
                 string temp;
                 while(getline(cartezianFile, temp)) {
-                    if(HasDoubles(doubles,temp) == false) {
-                        finalCartezianFile << temp << endl;
-                        fullness = true;
-                    }
+                    finalCartezianFile << temp << endl;
+                    fullness = true;
                 }
                 finalCartezianFile.close();
                 cartezianFile.close();
+                RemoveConditionByIndex(tempHead, indexCondition);
                 continue;
             }
-            else if(tempHead->oper == "AND") { //СДЕЛАТЬ РАЗВОРОТ НА СЛУЧАЙ, КОГДА СНАЧАЛА ОБЫЧНЫЙ, А ДАЛЕЕ КАРТЕЗИАН
+            else if(tempHead->oper == "AND") { 
                 string condition = tempHead->condition;
                 string nameTable;
                 if(condition.substr(0,5) == "books") nameTable = "books";
                 else nameTable = "shops";
                 
                 int targetPartCartesian;
-                if(condition.substr(0,5) == "books") targetPartCartesian = 1;
-                else targetPartCartesian = 2;
-                ofstream finalCartezianFile("finalFile.tmp");
+                if(condition.substr(0,5) == "books" && tempHead->next->condition.substr(0,5) == "books") targetPartCartesian = 1;
+                else if(condition.substr(0,5) == "books" && tempHead->next->condition.substr(0,5) == "shops") targetPartCartesian = 2;
+                else if(condition.substr(0,5) == "shops" && tempHead->next->condition.substr(0,5) == "books") targetPartCartesian = 2;
+                else if(condition.substr(0,5) == "shops" && tempHead->next->condition.substr(0,5) == "shops") targetPartCartesian = 1;
+                ofstream finalCartezianFile("finalFile.tmp", ios::app);
 
                 int indexConditionA = tempHead->index;
                 int indexConditionB = tempHead->next->index;
+                string nameTableB = (tempHead->next->condition).substr(0,5);
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionA)+ ".tmp"); 
-                ifstream ordinaryFile(nameTable + "/" + "CheckCondition_" + to_string(indexConditionB)+ ".tmp"); 
+                ifstream ordinaryFile(nameTableB + "/" + "CheckCondition_" + to_string(indexConditionB)+ ".tmp"); 
                 int targetColumnOrdinary = tempHead->targetColumns[0];
                 int targetColumnCartesian;
                 string tempA;
@@ -485,23 +483,27 @@ bool FilteringForOneFile(Condition* condition) {
                         cellA = GetCellByIndex(tempA,targetColumnOrdinary);
                     }
                     else {
-                        cellA = GetCellByIndex(tempA,(targetColumnOrdinary + 9 ));
+                        if(condition.substr(0,5) == "books") cellA = GetCellByIndex(tempA,(targetColumnOrdinary + 10 ));
+                        else if(condition.substr(0,5) == "shops") cellA = GetCellByIndex(tempA,(targetColumnOrdinary + 5 ));
                     }
                     string tempB;
+                    ordinaryFile.clear();            
+                    ordinaryFile.seekg(0, ios::beg);
                     while(getline(ordinaryFile,tempB)) {
                         string tempB1;
                         tempB1 = GetCellByIndex(tempB, targetColumnOrdinary);
                         if(tempB1 == cellA) {
-                            if(HasDoubles(doubles,tempA) == false) {
-                                finalCartezianFile << tempA << endl;
-                                fullness = true;
-                            }
+                            finalCartezianFile << tempA<< endl;
+                            fullness = true;
                         } 
                     }
                 }
                 cartezianFile.close();
                 ordinaryFile.close();
                 finalCartezianFile.close();
+                RemoveConditionByIndex(tempHead, indexConditionA);
+                RemoveConditionByIndex(tempHead, indexConditionB);
+                countConditions = countConditions - 2;
             }
             else if (tempHead->oper == ""){
                 int indexCondition = tempHead->index;
@@ -514,6 +516,7 @@ bool FilteringForOneFile(Condition* condition) {
                 }
                 cartezianFile.close();
                 finalFile.close();
+                RemoveConditionByIndex(tempHead, indexCondition);
             }
         }
         else if(tempHead->oper == "AND" || ConstFindConditionOper(tempHead, "AND") != nullptr) {
@@ -524,7 +527,7 @@ bool FilteringForOneFile(Condition* condition) {
                 else nameTable = "shops";
 
                 int targetPartCartesian = (nameTable == "books") ? 1 : 2;
-                ofstream finalCartezianFile("finalFile.tmp");
+                ofstream finalCartezianFile("finalFile.tmp", ios::app);
                 int indexConditionOrdinary = tempHead->index;
                 int indexConditionCartesian = tempHead->next->index;
                 ifstream ordinaryFile(nameTable + "/CheckCondition_" + to_string(indexConditionOrdinary) + ".tmp");
@@ -537,16 +540,18 @@ bool FilteringForOneFile(Condition* condition) {
                     if (targetPartCartesian == 1) {
                         cellFromCartesian = GetCellByIndex(tempCartesian, targetColumnOrdinary);
                     } else {
-                        cellFromCartesian = GetCellByIndex(tempCartesian, targetColumnOrdinary + 9); 
+                        cellFromCartesian = GetCellByIndex(tempCartesian, targetColumnOrdinary + 10); 
                     }
                     string tempOrdinary;
+
+                    ordinaryFile.clear();
+                    ordinaryFile.seekg(0, ios::beg);
                     while (getline(ordinaryFile, tempOrdinary)) {
                         string cellFromOrdinary = GetCellByIndex(tempOrdinary, targetColumnOrdinary);
                         if (cellFromOrdinary == cellFromCartesian) {
-                            if (!HasDoubles(doubles, tempCartesian)) {
-                                finalCartezianFile << tempCartesian << endl;
-                                fullness = true;
-                            }
+                            finalCartezianFile << tempCartesian << endl;
+                            fullness = true;
+                            
                         }
                     }
                     ordinaryFile.clear();
@@ -586,11 +591,13 @@ bool FilteringForOneFile(Condition* condition) {
                 string tempA;
                 while(getline(conditionFileA,tempA)) {
                     string tempB;
+                    conditionFileB.clear();              
+                    conditionFileB.seekg(0, ios::beg);
                     getline(conditionFileB,tempB);
                     string cellA =GetCellByIndex(tempA, targetColumnB);
                     string cellB =GetCellByIndex(tempB, targetColumnB);
                     if(cellA == cellB) {
-                        if(HasDoubles(doubles,tempA) == false) finalFile << tempA << endl;
+                        finalFile << tempA << endl;
                         fullness = true;
                     }
                 }
@@ -606,9 +613,9 @@ bool FilteringForOneFile(Condition* condition) {
                     int countPairs = 0;
                     while(getline(ss,cell, ';')) {
                         if(countPairs == 2) {
-                            if(HasDoubles(doubles,tempA) == false) finalFile << tempA << endl;
+                            finalFile << tempA << endl;
                             fullness = true;
-                            break; //??????
+                            break; 
                         }
                         countColumns++;
                         if(countColumns == targetColumnB1 || countColumns == targetColumnB2) {
@@ -620,45 +627,44 @@ bool FilteringForOneFile(Condition* condition) {
             finalFile.close();
             conditionFileA.close();
             conditionFileB.close();
-            //УДАЛИТЬ ТЕМПЫ
             tempHead = head;
-            //printConditionList(tempHead);
             RemoveConditionByIndex(tempHead,indexConditionA);
             RemoveConditionByIndex(tempHead,indexConditionB);
             countConditions = countConditions - 2;
-            //printConditionList(tempHead);
+            
         }
         else {
-            string condition = tempHead->condition;
+            string condition = tempHead->condition; 
             string nameTable;
             if(condition.substr(0,5) == "books") nameTable = "books";
             else nameTable = "shops";
             int indexCondition = tempHead->index;
 
-            ofstream finalFile("finalFile.tmp", ios::app);
+            
             ifstream conditionFileA(nameTable + "/" + "CheckCondition_" + to_string(indexCondition) + ".tmp");
             if(tempHead->trueOrFalse == 1) {
                 string temp;
                 while(getline(conditionFileA,temp)) {
-                    if(HasDoubles(doubles,temp) == false) {
+                    if(isLineInFile("finalFile.tmp", temp) == false) {
+                        ofstream finalFile("finalFile.tmp", ios::app);
                         finalFile << temp << endl;
                         fullness = true;
+                        finalFile.close();
                     }
                 }
             }
-            finalFile.close();
             conditionFileA.close();
 
-            RemoveConditionByIndex(newTempHead,indexCondition);
+            RemoveConditionByIndex(tempHead,indexCondition);
             countConditions = countConditions - 1;
 
         }
         if(countConditions == 0) return fullness;
-        if(countConditions == 1 && tempHead->oper == "") tempHead = tempHead->next;
+        if(countConditions == 2) continue;
         if(countConditions != 1) tempHead = tempHead->next;
         
     }
-    return fullness; //ЧТОБЫ ВЫВЕСТИ ЧТО ФАЙЛ ПУСТОЙ
+    return fullness; 
 }
 
 bool FindByCriteria(string expression) {
