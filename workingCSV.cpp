@@ -1,4 +1,8 @@
 #include <iostream>
+#include "fstream"
+#include "json.hpp"
+#include "headerFiles/workingCSV.h"
+
 using namespace std;
 using json = nlohmann::json;
 

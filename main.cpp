@@ -6,10 +6,11 @@
 #include <vector>
 #include <set>
 #include "json.hpp"
-#include "authorization.h"
-#include "workingCSV.h"
-#include "crud.h"
-#include "condition.h"
+#include "headerFiles/authorization.h"
+#include "headerFiles/workingCSV.h"
+#include "headerFiles/crud.h"
+#include "headerFiles/condition.h"
+#include "headerFiles/condition_additional.h"
 using json = nlohmann::json;
 using namespace std;
 
@@ -38,29 +39,29 @@ int main() {
 
     ConceptTable tableBooks("books/books.json");
     ConceptTable tableShops("shops/shops.json");
-/*
+
     vector<string> v1 = {"4", "Фантастика", "Лев Толстой", "Война и мир", "Издательство А", "2013", "400", "50", "Хорошее состояние"};
     vector<string> v2 = {"9", "Фэнтези", "Александр Пушкин", "Евгений Онегин", "Издательство Б", "2005", "400", "20", "Как новая"};
     vector<string> v3 = {"2", "Фэнтези", "Иван Тургенев", "Отцы и дети", "Издательство В", "2021", "500", "20", "С повреждениями"};
-    vector<string> v4 = {"6", "Нон-фикшн", "Фёдор Достоевский", "Преступление и наказание", "Издательство Г", "2012", "100", "10", "Бестселлер"};
-    vector<string> v5 = {"3", "Нон-фикшн", "Лев Толстой", "Война и мир", "Издательство Д", "2003", "300", "40", "Как новая"};
-    vector<string> v6 = {"2", "Фантастика", "Фёдор Достоевский", "Преступление и наказание", "Издательство А", "2018", "500", "30", "С повреждениями"};
-    vector<string> v7 = {"8", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Б", "2002", "500", "30", "Как новая"};
-    vector<string> v8 = {"1", "Нон-фикшн", "Лев Толстой", "Война и мир", "Издательство В", "2002", "100", "50", "Бестселлер"};
+    //vector<string> v4 = {"6", "Нон-фикшн", "Фёдор Достоевский", "Преступление и наказание", "Издательство Г", "2012", "100", "10", "Бестселлер"};
+    //vector<string> v5 = {"3", "Нон-фикшн", "Лев Толстой", "Война и мир", "Издательство Д", "2003", "300", "40", "Как новая"};
+    //vector<string> v6 = {"2", "Фантастика", "Фёдор Достоевский", "Преступление и наказание", "Издательство А", "2018", "500", "30", "С повреждениями"};
+    //vector<string> v7 = {"8", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Б", "2002", "500", "30", "Как новая"};
+    //vector<string> v8 = {"1", "Нон-фикшн", "Лев Толстой", "Война и мир", "Издательство В", "2002", "100", "50", "Бестселлер"};
     vector<string> v9 = {"1", "Нон-фикшн", "Лев Толстой", "Война и лол", "Издательство В", "2002", "100", "50", "Бестселлер"};
    
-    vector<string> v10 = {"3", "Фантастика", "Александр Пушкин", "Евгений Онегин", "Издательство А", "2007", "100", "30", "Как новая"};
+    //vector<string> v10 = {"3", "Фантастика", "Александр Пушкин", "Евгений Онегин", "Издательство А", "2007", "100", "30", "Как новая"};
 
     tableBooks.InsertLastRow(v1);
     tableBooks.InsertLastRow(v2);
     tableBooks.InsertLastRow(v3);
-    tableBooks.InsertLastRow(v4);
-    tableBooks.InsertLastRow(v5);
-    tableBooks.InsertLastRow(v6);
-    tableBooks.InsertLastRow(v7);
-    tableBooks.InsertLastRow(v8);
+    //tableBooks.InsertLastRow(v4);
+   // tableBooks.InsertLastRow(v5);
+    //tableBooks.InsertLastRow(v6);
+    //tableBooks.InsertLastRow(v7);
+    //tableBooks.InsertLastRow(v8);
     tableBooks.InsertLastRow(v9);
-    tableBooks.InsertLastRow(v10);
+    //tableBooks.InsertLastRow(v10);
 
     vector<string> v11 = {"1", "Магазин 1", "Москва, ул. Ленина, 1", "9:00 - 21:00"};
     vector<string> v21 = {"2", "Магазин 2", "Санкт-Петербург, пр. Невский, 10", "10:00 - 20:00"};
@@ -83,8 +84,8 @@ int main() {
     tableShops.InsertLastRow(v81);
     tableShops.InsertLastRow(v91);
     tableShops.InsertLastRow(v101);
-*/
-    //string tempstrA = "shops.name = 'Магазин 1' AND shops.name = 'парапр'";
-    //FindByCriteria(tempstrA);
+
+    string tempstrA = "books.author = 'Иван Тургенев'";
+    tableBooks.DeleteRowByCriteria(tempstrA);
 
 }

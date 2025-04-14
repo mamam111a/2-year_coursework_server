@@ -58,6 +58,9 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "condition_additional": "cpp",
+        "filesystem": "cpp",
+        "set": "cpp"
     }
 }
