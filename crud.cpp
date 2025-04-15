@@ -75,142 +75,157 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
     return 1;
 }
 
-bool ConceptTable::DeleteLastRow() {
-    string currFilepath = name + "/" + name + "_" + to_string(lastCSV) + ".csv";
-    if (LastLine == 0) {
-        return false; 
-    }
-    else if (LastLine == 1) {
-        filesystem::remove(currFilepath);
-        LastLine = tupleLimit;
-        lastCSV--;
-        ofstream pkFile(name + "/" + name + "_last_Line.txt");
-        pkFile << LastLine;
-        pkFile.close();
-
-        ofstream listCSV(name + "/" + name + "_list_CSV.txt");
-        listCSV << lastCSV;
-        listCSV.close();
-        return true;
-    }
-    string currLine;
-    string prevLine;
-    string tempFilepath = "DeleteLastRow.tmp";
-    ifstream inFile(currFilepath);
-    ofstream tempFile(tempFilepath);
-
-    bool isFirst = true;
-    while (getline(inFile, currLine)) {
-        if (isFirst==false) {
-            tempFile << prevLine << endl;
-        }
-        prevLine = currLine;
-        isFirst = false;
-    }
-    inFile.close();
-    tempFile.close();
-
-    filesystem::remove(currFilepath);
-    filesystem::rename(tempFilepath, currFilepath);
-
-    LastLine--;
-    ofstream pkFile(name + "/" + name + "_last_Line.txt");
-    pkFile << LastLine;
-    pkFile.close();
-    return 1;
-}
-
-
-bool ConceptTable::DeleteRowByCriteria(string& criteria) {
+bool ConceptTable::Correction(string& criteria, string& nameColumn, string newValue) {
     bool parameter = false;
     FindByCriteria(criteria, parameter);
     string criteriaFilePath = "finalFile.tmp";
-    bool skipRow = false;
+    string tempFilteredPath = name + "/correctedRows.tmp";
+
+    json jsonData = ReadSchema(name + "/" + name + ".json");
+    int columnIndex = GetColumnIndex(jsonData, name, nameColumn);
+    if (columnIndex == -1) return false;
+
+    ofstream corrected(tempFilteredPath);
     for (int i = 1; i <= lastCSV; i++) {
-        string currFilepath = name + "/" + name + "_" + to_string(i) + ".csv";
-        ifstream currFile(currFilepath);
-        string tempFilepath = name + "/" + name + "_" + to_string(i) + "_temp.csv";
-        ofstream tempFile(tempFilepath);
-        string currLine;
-
-        int index = 1;
+        string filePath = name + "/" + name + "_" + to_string(i) + ".csv";
+        if (!filesystem::exists(filePath)) continue;
+        ifstream inFile(filePath);
         ifstream conditionFile(criteriaFilePath);
-        bool needDelete = false;
-        if(skipRow == false) {
-            while(getline(currFile, currLine)) {
-                bool deleteRow = false;
-
-                string condition;
-                while(getline(conditionFile, condition)) {
-                    if (currLine.find(condition) != string::npos) {
-                        deleteRow = true;
-                        break;
-                    }
-                }
-                conditionFile.clear();
-                conditionFile.seekg(0, ios::beg);
-
-                if(deleteRow == true) {
-                     if(index == 1) {
-                        if(i == lastCSV && index == LastLine) {
-                            currFile.close();
-                            LastLine = tupleLimit;
-                            lastCSV--;
-                            needDelete = true;
-                        }
-                     }
-                     else if(index == tupleLimit) {
-                        ifstream nextCSV(name + "/" + name + "_" + to_string(i+1) + ".csv");
-                        string nextLine;
-                        getline(nextCSV, nextLine);
-                        tempFile << to_string(tupleLimit) << nextLine.substr(nextLine.find(';') + 1) << endl;
-
-                        skipRow = true;
-                        nextCSV.close();
-                        index = 1;
-                        LastLine--;
-                     }
-                     else {
-                        auto pos = currLine.find(";");
-                        string currIndexStr = currLine.substr(0,pos);
-                        int currIndexInt = stoi(currIndexStr) - 1;
-                        tempFile << to_string(currIndexInt) << ";" << currLine.substr(currLine.find(';') + 1) << endl;
-                        index--;
-                        LastLine--;
-                     }
-
-                }
-                else {
-                    tempFile << to_string(index) << ";" << currLine.substr(currLine.find(';') + 1) << endl;
-                    index++;
+        string line, condition;
+        while (getline(inFile, line)) {
+            bool match = false;
+            conditionFile.clear();
+            conditionFile.seekg(0, ios::beg);
+            while (getline(conditionFile, condition)) {
+                if (!condition.empty() && line.find(condition) != string::npos) {
+                    match = true;
+                    break;
                 }
             }
+            string processedLine = line.substr(line.find(';') + 1);
+            vector<string> fields;
+            stringstream ss(processedLine);
+            string field;
+            while (getline(ss, field, ';')) {
+                fields.push_back(field);
+            }
+            if (match && columnIndex < fields.size()) {
+                fields[columnIndex-1] = newValue;
+            }
+            string newLine = to_string(0); 
+            for (auto& f : fields) {
+                newLine += ";" + f;
+            }
+            corrected << newLine << endl;
         }
-        else {
-            skipRow = false;
-            index = 1;
-            continue;
-        }
-        currFile.close();
-        tempFile.close();
-        if (needDelete == true) {
-            filesystem::remove(currFilepath);
-            filesystem::remove(tempFilepath);
-            needDelete = false;
-        } else {
-            filesystem::remove(currFilepath);  
-            filesystem::rename(tempFilepath, currFilepath);
-        }
-        ofstream lastCSVfile(name + "/" + name + "_list_CSV.txt");
-        lastCSVfile << lastCSV;
-        lastCSVfile.close();
-        ofstream lastLinefile(name + "/" + name + "_last_Line.txt");
-        lastLinefile << LastLine;
-        lastLinefile.close();
+        inFile.close();
+        conditionFile.close();
+        filesystem::remove(filePath);
     }
+    corrected.close();
 
-    DeleteTmpInDirectory(".");         
-    DeleteTmpInDirectory("books"); 
+    ifstream tempFile(tempFilteredPath);
+    int index = 1;
+    int rowCount = 0;
+    string line;
+    ofstream newFile;
+    bool fileOpen = false;
+    while (getline(tempFile, line)) {
+        if (rowCount == 0) {
+            string newPath = name + "/" + name + "_" + to_string(index) + ".csv";
+            newFile.open(newPath);
+            fileOpen = true;
+        }
+        newFile << to_string(rowCount + 1) << ";" << line.substr(line.find(';') + 1) << endl;
+        rowCount++;
+        if (rowCount == tupleLimit) {
+            newFile.close();
+            fileOpen = false;
+            rowCount = 0;
+            index++;
+        }
+    }
+    if (fileOpen) newFile.close();
+    tempFile.close();
+    filesystem::remove(tempFilteredPath);
+
+    DeleteTmpInDirectory(".");
+    DeleteTmpInDirectory("books");
+    DeleteTmpInDirectory("shops");
+
+    return true;
+}
+bool ConceptTable::DeleteRowByCriteria(string& criteria) {
+    bool parameter = false;
+    FindByCriteria(criteria,parameter);
+    string criteriaFilePath = "finalFile.tmp";
+    string tempFilteredPath = name + "/filteredRows.tmp";
+
+    ofstream filtered(tempFilteredPath);
+    for (int i = 1; i <= lastCSV; i++) {
+        string filePath = name + "/" + name + "_" + to_string(i) + ".csv";
+        if (!filesystem::exists(filePath)) continue;
+        ifstream inFile(filePath);
+        ifstream conditionFile(criteriaFilePath);
+        string line;
+        string condition;
+
+        while (getline(inFile, line)) {
+            bool found = false;
+            conditionFile.clear();
+            conditionFile.seekg(0, ios::beg);
+            while (getline(conditionFile, condition)) {
+                if (!condition.empty() && line.find(condition) != string::npos) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                filtered << line << endl;
+            }
+        }
+        inFile.close();
+        conditionFile.close();
+        filesystem::remove(filePath);
+    }
+    filtered.close();
+    ifstream tempFile(tempFilteredPath);
+    int index = 1;
+    int rowCount = 0;
+    string line;
+    ofstream newFile;
+    bool fileOpen = false;
+
+    while (getline(tempFile, line)) {
+        if (rowCount == 0) {
+            string newPath = name + "/" + name + "_" + to_string(index) + ".csv";
+            newFile.open(newPath);
+            fileOpen = true;
+        }
+        newFile << to_string(rowCount + 1) << ";" << line.substr(line.find(';') + 1) << endl;
+        rowCount++;
+        if (rowCount == tupleLimit) {
+            newFile.close();
+            fileOpen = false;
+            rowCount = 0;
+            index++;
+        }
+    }
+    if (fileOpen) newFile.close();
+    tempFile.close();
+    filesystem::remove(tempFilteredPath);
+    if (rowCount == 0) lastCSV = index - 1;
+    else lastCSV = index;
+    
+    ofstream lastCSVfile(name + "/" + name + "_list_CSV.txt");
+    lastCSVfile << lastCSV;
+    lastCSVfile.close();
+    ofstream lastLinefile(name + "/" + name + "_last_Line.txt");
+    lastLinefile << ((rowCount == 0) ? tupleLimit : rowCount);
+    lastLinefile.close();
+
+    DeleteTmpInDirectory(".");
+    DeleteTmpInDirectory("books");
     DeleteTmpInDirectory("shops");
     return true;
 }

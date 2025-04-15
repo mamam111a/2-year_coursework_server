@@ -24,6 +24,7 @@ public:
     bool DeleteLastRow();
     bool DeleteForCriteria(string criteria);
     bool DeleteRowByCriteria(string& criteria);
+    bool Correction(string& criteria, string& nameColumn, string newValue);
 
 };
 
