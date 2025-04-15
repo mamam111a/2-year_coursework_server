@@ -1,0 +1,37 @@
+# Используем официальный образ для C++
+FROM ubuntu:20.04
+
+# Устанавливаем необходимые зависимости
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    g++ \
+    cmake \
+    libjsoncpp-dev \
+    libssl-dev \
+    wget \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем переменные окружения
+ENV TZ=Europe/Moscow
+
+# Создаем пользователя tester с UID и GID из переменных окружения (по умолчанию 100001)
+ARG UID=100001
+ARG GID=100001
+RUN groupadd -g $GID tester && \
+    useradd -m -u $UID -g $GID tester && \
+    mkdir -p /app && \
+    chown tester:tester /app
+
+# Копируем исходный код в контейнер
+WORKDIR /app
+COPY . /app/
+
+# Собираем приложение
+RUN g++ -o server server.cpp -ljsoncpp -lpthread -std=c++11
+RUN g++ -o client client.cpp -ljsoncpp -lpthread -std=c++11
+
+# Настроим контейнер на запуск приложения
+CMD ["./server"]
