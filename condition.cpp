@@ -295,7 +295,7 @@ bool FilteringForOneFile(Condition* condition) {
     bool fullness = false;
     bool isFoundOR = ConstFindConditionOper(condition, "OR");
     while(condition != nullptr) {
-        if(condition->oper == "AND" && condition->trueOrFalse == false) {
+        if(condition->oper == "AND" && condition->trueOrFalse == false) { //НУЖНО ПРОВЕРИТЬ НА ЧИСТО ДВА AND
             if(isFoundOR == false) return false;
             RemoveConditionByIndex(tempHead, condition->index);
             int tempCond = condition->index + 1;
@@ -542,7 +542,7 @@ bool FilteringForOneFile(Condition* condition) {
     return fullness; 
 }
 
-bool FindByCriteria(string&expression, bool& parameter) {
+bool FindByCriteria(string& expression, bool& isEnd) { //возвращает есть ли ваще что-то подходящее
     bool fullness;
     Condition* condition = SplitExpressionForStruct(expression);
     Condition* newCondition = ReplacingConditionsWithBool(condition);
@@ -552,7 +552,7 @@ bool FindByCriteria(string&expression, bool& parameter) {
     else {
         fullness = false;
     }
-    if(parameter == true) {
+    if(isEnd == true) {
         PrintFinalFile();
         DeleteTmpInDirectory(".");         
         DeleteTmpInDirectory("books"); 

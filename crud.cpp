@@ -77,7 +77,7 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
 
 bool ConceptTable::Correction(string& criteria, string& nameColumn, string newValue) {
     bool parameter = false;
-    FindByCriteria(criteria, parameter);
+    FindByCriteria(criteria, parameter); //возможно нужно добавить if else типа вдруг нет изменений
     string criteriaFilePath = "finalFile.tmp";
     string tempFilteredPath = name + "/correctedRows.tmp";
 
@@ -157,7 +157,7 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
 }
 bool ConceptTable::DeleteRowByCriteria(string& criteria) {
     bool parameter = false;
-    FindByCriteria(criteria,parameter);
+    FindByCriteria(criteria,parameter); //возможно нужно добавить if else типа вдруг нет изменений
     string criteriaFilePath = "finalFile.tmp";
     string tempFilteredPath = name + "/filteredRows.tmp";
 

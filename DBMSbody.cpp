@@ -11,35 +11,21 @@
 #include "headerFiles/crud.h"
 #include "headerFiles/condition.h"
 #include "headerFiles/condition_additional.h"
+#include "DBMSbody.h"
+
 using json = nlohmann::json;
 using namespace std;
+#include <sys/socket.h>
+
+bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toClient) {
+    toClient.str("");
+    toClient.clear();
+    toClient << "\nпривяу\n";
 
 
-bool DBMS_Queries(string& command) {
-    int temp = 0;
-    cout << endl << "Авторизация - 1" << endl << "Регистрация 2" << endl;
-    cin >> temp;
-    string login;
-    string password;
-    cout << endl << "Введите логин и пароль через пробел ==>> ";
-    cin >> login >> password;
-    if(temp == 2) {
-        SaveLoginPasswordToFile(login, password);
-        return 0;
-    }
-    else {
-        if (CheckAuthorization(login, password)) cout << endl << "Успешный вход!" << endl;
-        else {
-            cout << endl << "Ошибка!" << endl;
-            return 0;
-        }
-    }
-    CreateTableFromJson("books/books.json");
-    CreateTableFromJson("shops/shops.json");
-
-    ConceptTable tableBooks("books/books.json");
-    ConceptTable tableShops("shops/shops.json");
-
+    return true;
+}
+/*
     vector<string> v1 = {"4", "Фантастика", "Лев Толстой", "Война и хехе", "Издательство А", "2013", "400", "50", "Хорошее состояние"};
     vector<string> v2 = {"9", "Фэнтези", "Александр Пушкин", "Евгений хехе", "Издательство Б", "2005", "400", "20", "Как новая"};
     vector<string> v3 = {"2", "Фэнтези", "Иван Тургенев", "Отцы и дети", "Издательство В", "2021", "500", "20", "С повреждениями"};
@@ -82,7 +68,7 @@ bool DBMS_Queries(string& command) {
     tableShops.InsertLastRow(v71);
     tableShops.InsertLastRow(v81);
     tableShops.InsertLastRow(v91);
-    tableShops.InsertLastRow(v101);*/
+    tableShops.InsertLastRow(v101);
 
     string tempstrA = "books.author = 'Лев Толстой'";
     string nameColumn = "shop_id";
@@ -91,5 +77,5 @@ bool DBMS_Queries(string& command) {
     //string tempstrb = "books.title = 'Евгений хехе'";
     //tableBooks.DeleteRowByCriteria(tempstrA);
     //tableBooks.DeleteRowByCriteria(tempstrb);
-
-}
+    return true;
+*/

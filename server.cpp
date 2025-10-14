@@ -1,127 +1,228 @@
+#include "headerFiles/authorization.h"
+#include "DBMSbody.h"
+#include "headerFiles/crud.h"
+#include "headerFiles/workingCSV.h"
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
-#include <arpa/inet.h>//содержит функции для работы с сетевыми адресами, такие как htons.
-#include <sys/socket.h> //определяет символы, начинающиеся с " AF_ " для различных видов сетей и для работы сокетов
-#include <netinet/in.h> //содержащую определения для работы с интернет-адресами и портами.
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <fstream>
 #include <sstream>
 #include <csignal>
 #include <thread>
-#include "DBMSbody.h"
-using namespace std;
 
+
+using namespace std;
 
 bool running = true;
 
-void SignalCheck(int signal) { //сигнал прерывания
+void SignalCheck(int signal) {
     if (signal == SIGINT) {
-        running = false; 
+        running = false;
     }
 }
-
-void ConnectionProcessing(int clientSocket, int serverSocket, ostringstream& toClient) {
+struct ClientSession {
+    bool authorized = false;
+    string username;
+};
+void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
     char buffer[1024];
     int receivedBytes;
+    ClientSession session;
 
+    ostringstream toClient;
+
+    // Игнорируем SIGPIPE, чтобы send() не убивал сервер
+    signal(SIGPIPE, SIG_IGN);
+
+    // Шаг 1. Спрашиваем авторизацию
+    //toClient << "1 - Вход\n2 - Регистрация\nВыберите: ";
+   // send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+/*
+    receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
+    if (receivedBytes <= 0) {
+        cout << "CLIENT " << clientIP << ":" << clientPort << " отключился." << endl;
+        close(clientSocket);
+        return;
+    }
+*/
+    //buffer[receivedBytes] = '\0';
+    //string choice(buffer);
+
+    //toClient.str("");
+    //toClient.clear();
+    //toClient << "Введите логин и пароль через пробел: ";
+    //send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+
+    receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
+    if (receivedBytes <= 0) {
+        cout << "CLIENT " << clientIP << ":" << clientPort << " отключился на этапе ввода логина/пароля." << endl;
+        close(clientSocket);
+        return;
+    }
+    int pos0,pos1,pos2;
+    string login,password,code;
+    buffer[receivedBytes] = '\0';
+    string str(buffer);
+    char command = str[0];
+    if(command == '1') {
+        pos0 = str.find('|');
+        pos1 = str.find('|', pos0 + 1);
+    }
+    else{
+        pos0 = str.find('|');        
+        pos1 = str.find('|', pos0 + 1);
+        pos2 = str.find('|', pos1 + 1); 
+    }
+    
+    if(command == '1') {
+        login   = str.substr(pos0 + 1, pos1 - pos0 - 1);
+        password = str.substr(pos1 + 1);
+    }
+    else {
+        login   = str.substr(pos0 + 1, pos1 - pos0 - 1);
+        password = str.substr(pos1 + 1, pos2 - pos1 - 1);
+        code     = str.substr(pos2 + 1); 
+    }
+    cout << "Command: " << command << std::endl;
+    cout << "Login: " << login << std::endl;
+    cout << "Password: " << password << std::endl;
+    cout << "Code: " << code << std::endl; 
+
+    if (command == '2') {
+        SaveLoginPasswordToFile(login, password);
+        session.authorized = true;
+        session.username = login;
+        cout << "CLIENT " << clientIP << ":" << clientPort << " зарегистрирован как " << login << endl;
+
+        toClient.str("");
+        toClient.clear();
+        toClient << "\nУспешная регистрация!";
+        send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+    } else if (command == '1') {
+        if (CheckAuthorization(login, password)) {
+            session.authorized = true;
+            session.username = login;
+            cout << "CLIENT " << clientIP << ":" << clientPort << " авторизовался как " << login << endl;
+            toClient.str("");
+            toClient.clear();
+            toClient << "\nВы подключились. Поздравляем!";
+            send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+
+        } else {
+            toClient.str("");
+            toClient.clear();
+            toClient << "Некорректные данные!";
+            send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+            cout << "CLIENT " << clientIP << ":" << clientPort << " не прошёл авторизацию." << endl;
+        }
+    }
+    
+    CreateTableFromJson("books/books.json");
+    CreateTableFromJson("shops/shops.json");
+
+    ConceptTable tableBooks("books/books.json");
+    ConceptTable tableShops("shops/shops.json");
+
+    // Шаг 2. Работа с базой
     while (true) {
-        memset(buffer, 0, 1024);  // очистка буфера, заполнение нулями
-        receivedBytes = recv(clientSocket, buffer, 1024 - 1, 0); //функция получения данных (0 это флаг), 
-        if (receivedBytes < 0) {                                       // -1 так как оставляем байт на знак окончания
-            cout << "SERVER: Ошибка чтения сокета клиента!!!" << endl;
+        memset(buffer, 0, sizeof(buffer));
+        receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
+
+        if (receivedBytes <= 0) {
+            cout << "CLIENT " << clientIP << ":" << clientPort << " отключился." << endl;
             break;
         }
 
-        if (receivedBytes == 0) {
-            cout << "SERVER: КЛИЕНТ ПОКИНУЛ НАС!!!" << endl;
-            break;
-        }
+        buffer[receivedBytes] = '\0';
+        string command(buffer);
 
-        string command(buffer); 
+        if (!session.authorized) continue;
 
-        // очищаем поток перед новым выводом
-        toClient.str("");   
-        toClient.clear(); //сброс флагов
+        cout << "CLIENT " << clientIP << ":" << clientPort << " -> " << command << endl;
 
-        DBMS_Queries(command);
-
+        toClient.str("");
+        toClient.clear();
+        DBMS_Queries(clientSocket, command, toClient);
         string response = toClient.str();
-        cout << "SERVER: Отправка данных: " << response << endl; // Для отладки
-        int bytesSent = send(clientSocket, response.c_str(), response.size(), 0);
-        if (bytesSent < 0) {
-            cout << "SERVER: Ошибка отправки данных клиенту" << endl;
+        if (send(clientSocket, response.c_str(), response.size(), 0) <= 0) {
+            cout << "Ошибка отправки данных клиенту " << clientIP << ":" << clientPort << endl; //ВЫДАЕТ ОШИБКУ
             break;
         }
     }
 
     close(clientSocket);
 }
+
+
 int main() {
-    int serverSocket; //дескрипторы сокета
+    int serverSocket;
     int clientSocket;
-    struct sockaddr_in serverSettings; //структура, хранит сетевую информацию для соединения по протоколу ipv4
+    struct sockaddr_in serverSettings;
     struct sockaddr_in clientSettings;
+    socklen_t clientSetLen = sizeof(clientSettings);
 
-    socklen_t clientSetLen = sizeof(clientSettings); //чтобы знать, сколько памяти выделено, чтобы записать
-
-    //создание сокета
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0); //AF_INET это семейство сокетов ipv4
-    if (serverSocket < 0) { //SOCK_STREAM это стримовый сокет, использующий TCP  //0 - выбирает операционка, IPPROTO_TCP устанавливает TCP протокол
-        cout << endl <<"SERVER: Ошибка создания сокета!!!" << endl;
+    // Создание сокета
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        cout << "SERVER: Ошибка создания сокета!!!" << endl;
         return 0;
     }
 
-    //настройка адреса сервера
     serverSettings.sin_family = AF_INET;
-    serverSettings.sin_port = htons(7432); //преобразует номер порта из формата хоста в сетевой порядок байт
-    serverSettings.sin_addr.s_addr = inet_addr("127.0.0.1");  
+    serverSettings.sin_port = htons(7432);
+    serverSettings.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    int opt = 1; //включение опции сокета SO_REUSEADDR
-    //setsockopt настраивает сокет. sql-socket для настройки параметров (левел)
-    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) { //для повторного дсоутпа к занятому порту
+    int opt = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("SERVER: Ошибка установки SO_REUSEADDR");
         close(serverSocket);
         return 0;
     }
-    //привязка сокета к адресу
-    if (bind(serverSocket, (struct sockaddr*)& serverSettings, sizeof(serverSettings)) < 0) { //struct sockaddr* это приведение типа in
+
+    if (bind(serverSocket, (struct sockaddr*)&serverSettings, sizeof(serverSettings)) < 0) {
         perror("SERVER: Ошибка привязки сокета");
         close(serverSocket);
         return 0;
     }
 
-    // прослушивание
-    if (listen(serverSocket, 1) < 0) {
-        cout << endl <<"SERVER: Ошибка прослушивания на сокете!!!" << endl;
+    if (listen(serverSocket, 5) < 0) {
+        cout << "SERVER: Ошибка прослушивания на сокете!!!" << endl;
         close(serverSocket);
         return 0;
     }
 
     ifstream File("Salute.txt");
     string token;
-    while(getline(File,token)) {
+    while (getline(File, token)) {
         cout << token << endl;
     }
-    ostringstream toClient;
-    //ReadConfiguration("schema.json", toClient);
 
-    cout << endl << endl << "SERVER: Ожидание подключения (port 7432)" << endl;
-    
+    cout << "\nSERVER: Ожидание подключения (port 7432)" << endl;
+
     signal(SIGINT, SignalCheck);
 
     while (running) {
         clientSocket = accept(serverSocket, (struct sockaddr*)&clientSettings, &clientSetLen);
         if (clientSocket < 0) {
             if (!running) break;
-            cout << "Ошибка подключения клиента!" << endl;
+            cout << "SERVER: Ошибка подключения клиента!" << endl;
             continue;
         }
-        
-        // новый поток для каждого клиента
-        thread stream(ConnectionProcessing, clientSocket, serverSocket, ref(toClient));//ref передает ссылку
-        stream.detach(); // работать асинхронно
+
+        // Получаем IP и порт клиента
+        char clientIP[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &clientSettings.sin_addr, clientIP, INET_ADDRSTRLEN);
+        int clientPort = ntohs(clientSettings.sin_port);
+
+        cout << "SERVER: Подключился клиент " << clientIP << ":" << clientPort << endl;
+
+        // Создаём поток и передаём копию IP/порта
+        thread t(ConnectionProcessing, clientSocket, string(clientIP), clientPort);
+        t.detach();
     }
-    
 
     close(serverSocket);
     cout << "SERVER: Завершение работы." << endl;

@@ -1,3 +1,0 @@
-logging: true
-max_connections: 10
-port: 7432

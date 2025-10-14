@@ -1,10 +1,9 @@
+#ifndef DBMSBODY_H
+#define DBMSBODY_H
 
-#ifndef AUTHORIZATION_H
-#define AUTHORIZATION_H
-
-#include <iostream>
+#include <string>
+#include <sstream>
 using namespace std;
-
-bool DBMS_Queries(string& command);
+bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toClient);
 
 #endif
