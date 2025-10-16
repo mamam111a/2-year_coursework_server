@@ -20,6 +20,6 @@ bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount);
 bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian);
 Condition* ReplacingConditionsWithBool(Condition* expressions);
 bool FilteringForOneFile(Condition* condition);
-bool FindByCriteria(string& expression, bool& parameter);
+bool FindByCriteria(string& expression);
 
 #endif

@@ -16,14 +16,108 @@
 using json = nlohmann::json;
 using namespace std;
 #include <sys/socket.h>
-
+void DeleteTmp() {
+    DeleteTmpInDirectory(".");         
+    DeleteTmpInDirectory("books"); 
+    DeleteTmpInDirectory("shops");
+}
 bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toClient) {
+    //section|author|name|publisher|publisher_year
+    //  0    // 1   // 2 // 3      // 4           
+    string query;
+    vector<string> elements;
+    stringstream ss(command);
+    string word;
+    while (getline(ss, word, '|')) {
+        elements.push_back(word);
+    }
+    map<int, string> orElements;
+    bool isFoundOR = false;
+    for (int i = 0; i < elements.size(); i++) {
+        if (elements[i].find("или") != string::npos || elements[i].find("ИЛИ") != string::npos) {
+            orElements[i] = elements[i];
+            isFoundOR = true;
+        }
+    }
+    vector<int> toSkip;
+    if(isFoundOR) {
+        for (auto& x : orElements) {
+            int pos;
+            while ((pos = x.second.find("или", pos)) != string::npos) {
+                x.second.replace(pos, 3, "|");
+                pos += 1; 
+            }
+            pos = 0;
+            while ((pos = x.second.find("ИЛИ", pos)) != string::npos) {
+                x.second.replace(pos, 3, "|");
+                pos += 1;
+            }
+            int start = x.second.find_first_not_of(" \t");
+            int end = x.second.find_last_not_of(" \t");
+            if (start != string::npos && end != string::npos)
+                x.second = x.second.substr(start, end - start + 1);
+            
+            pos = 0;
+            while ((pos = x.second.find("  ", pos)) != string::npos) {
+                x.second.replace(pos, 2, " ");
+            }
+            vector<string> words;
+            stringstream ss(x.second);
+            string word;
+            while (getline(ss, word, '|')) {  
+                words.push_back(word);
+            }
+            query += "books.";
+            if (x.first == 0) query += "section = '" + x.second + "' OR ";
+            else if (x.first == 1) query += "author = '" + x.second + "' OR ";
+            else if (x.first == 2) query += "title = '" + x.second + "' OR ";
+            else if (x.first == 3) query += "publisher = '" + x.second + "' OR ";
+            else if (x.first == 4) query += "publishing_year = '" + x.second + "' OR ";
+            toSkip.push_back(x.first);
+
+        }
+        query.erase(query.size() - 3); //удаление лишнего OR
+    }
+    for(int i = 0; i < elements.size(); i++) {
+        if(elements[i].empty()) continue;
+        bool letsGo = false;
+        for(auto& j : toSkip) {
+            if(i == j) letsGo = true;
+            break;
+        }
+        if(letsGo) continue;
+        string category;
+        if(i == 0) category = "section";
+        if(i == 1) category = "author";
+        if(i == 2) category = "title";
+        if(i == 3) category = "publisher";
+        if(i == 4) category = "publishing_year";
+        if(isFoundOR) query += "AND books." + category + " = '" + elements[i] + "'";
+        else query += "books." + category + " = '" + elements[i] + "' AND ";
+    }
+    query.erase(query.size() - 4);
     toClient.str("");
     toClient.clear();
-    toClient << "\nпривяу\n";
+    cout << endl << query << endl;
+    if(FindByCriteria(query)) {
+        string message;
+        ifstream finalFile("finalFile.tmp");
+        string line;
+        while (getline(finalFile, line)) {
+            message += line + " \n ";
+        }
+        toClient << message;
+        finalFile.close();
+        DeleteTmp();
+        return true;
+    }
+    else {
+        DeleteTmp();
+        toClient << "\nНичего не найдено :( ))";
+        return false;
+    }
 
 
-    return true;
 }
 /*
     vector<string> v1 = {"4", "Фантастика", "Лев Толстой", "Война и хехе", "Издательство А", "2013", "400", "50", "Хорошее состояние"};

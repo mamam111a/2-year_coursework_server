@@ -8,14 +8,17 @@
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
-                "main.cpp",
+                "server.cpp",
                 "authorization.cpp",
                 "condition.cpp",
                 "condition_additional.cpp",
                 "crud.cpp",
                 "workingCSV.cpp",
+                "DBMSbody.cpp",
                 "-o",
-                "main"
+                "server",
+                "-lssl",
+                "-lcrypto"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

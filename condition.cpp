@@ -322,8 +322,10 @@ bool FilteringForOneFile(Condition* condition) {
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp");
                 string temp;
                 while(getline(cartezianFile, temp)) {
-                    finalCartezianFile << temp << endl;
-                    fullness = true;
+                    if(!isLineInFile("finalFile.tmp", temp)) {
+                        finalCartezianFile << temp << endl;
+                        fullness = true;
+                    } 
                 }
                 finalCartezianFile.close();
                 cartezianFile.close();
@@ -365,11 +367,12 @@ bool FilteringForOneFile(Condition* condition) {
                     ordinaryFile.clear();            
                     ordinaryFile.seekg(0, ios::beg);
                     while(getline(ordinaryFile,tempB)) {
-                        string tempB1;
-                        tempB1 = GetCellByIndex(tempB, targetColumnOrdinary);
+                        string tempB1 = GetCellByIndex(tempB, targetColumnOrdinary);
                         if(tempB1 == cellA) {
-                            finalCartezianFile << tempA<< endl;
-                            fullness = true;
+                            if(!isLineInFile("finalFile.tmp", tempA)) {  
+                                finalCartezianFile << tempA << endl;
+                                fullness = true;
+                            }
                         } 
                     }
                 }
@@ -386,8 +389,11 @@ bool FilteringForOneFile(Condition* condition) {
                 ofstream finalFile("finalFile.tmp", ios::app);
                 string temp;
                 while(getline(cartezianFile, temp)) {
-                    finalFile << temp << endl;
-                    fullness = true;
+                    if(!isLineInFile("finalFile.tmp", temp)) {
+                        finalFile << temp << endl;
+                        fullness = true;
+                    }
+                    
                 }
                 cartezianFile.close();
                 finalFile.close();
@@ -424,8 +430,10 @@ bool FilteringForOneFile(Condition* condition) {
                     while (getline(ordinaryFile, tempOrdinary)) {
                         string cellFromOrdinary = GetCellByIndex(tempOrdinary, targetColumnOrdinary);
                         if (cellFromOrdinary == cellFromCartesian) {
-                            finalCartezianFile << tempCartesian << endl;
-                            fullness = true;
+                            if(!isLineInFile("finalFile.tmp", tempCartesian)) {
+                                finalCartezianFile << tempCartesian << endl;
+                                fullness = true;
+                            }
                             
                         }
                     }
@@ -472,8 +480,11 @@ bool FilteringForOneFile(Condition* condition) {
                     string cellA =GetCellByIndex(tempA, targetColumnB);
                     string cellB =GetCellByIndex(tempB, targetColumnB);
                     if(cellA == cellB) {
-                        finalFile << tempA << endl;
-                        fullness = true;
+                        if(!isLineInFile("finalFile.tmp", tempA)) {
+                            finalFile << tempA << endl;
+                            fullness = true;
+                        }
+                        
                     }
                 }
             }
@@ -488,9 +499,12 @@ bool FilteringForOneFile(Condition* condition) {
                     int countPairs = 0;
                     while(getline(ss,cell, ';')) {
                         if(countPairs == 2) {
-                            finalFile << tempA << endl;
-                            fullness = true;
-                            break; 
+                            if(!isLineInFile("finalFile.tmp", tempA)) {
+                                finalFile << tempA << endl;
+                                fullness = true;
+                                break;
+                            }
+                             
                         }
                         countColumns++;
                         if(countColumns == targetColumnB1 || countColumns == targetColumnB2) {
@@ -542,7 +556,7 @@ bool FilteringForOneFile(Condition* condition) {
     return fullness; 
 }
 
-bool FindByCriteria(string& expression, bool& isEnd) { //возвращает есть ли ваще что-то подходящее
+bool FindByCriteria(string& expression) { //возвращает есть ли ваще что-то подходящее
     bool fullness;
     Condition* condition = SplitExpressionForStruct(expression);
     Condition* newCondition = ReplacingConditionsWithBool(condition);
@@ -551,12 +565,6 @@ bool FindByCriteria(string& expression, bool& isEnd) { //возвращает е
     }
     else {
         fullness = false;
-    }
-    if(isEnd == true) {
-        PrintFinalFile();
-        DeleteTmpInDirectory(".");         
-        DeleteTmpInDirectory("books"); 
-        DeleteTmpInDirectory("shops"); 
     }
     return fullness;
 }

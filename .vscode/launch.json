@@ -5,7 +5,7 @@
             "name": "Запуск проекта",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/main",  // Путь к исполняемому файлу
+            "program": "${workspaceFolder}/server",  // Путь к исполняемому файлу
             "args": [],  // Можешь передать аргументы командной строки, если нужно
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

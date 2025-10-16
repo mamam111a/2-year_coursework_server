@@ -26,107 +26,117 @@ void SignalCheck(int signal) {
 struct ClientSession {
     bool authorized = false;
     string username;
+    string role;
 };
 void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
     char buffer[1024];
     int receivedBytes;
     ClientSession session;
-
     ostringstream toClient;
 
-    // Игнорируем SIGPIPE, чтобы send() не убивал сервер
     signal(SIGPIPE, SIG_IGN);
 
-    // Шаг 1. Спрашиваем авторизацию
-    //toClient << "1 - Вход\n2 - Регистрация\nВыберите: ";
-   // send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
-/*
-    receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
-    if (receivedBytes <= 0) {
-        cout << "CLIENT " << clientIP << ":" << clientPort << " отключился." << endl;
-        close(clientSocket);
-        return;
-    }
-*/
-    //buffer[receivedBytes] = '\0';
-    //string choice(buffer);
+    while (!session.authorized) {
+        memset(buffer, 0, sizeof(buffer));
+        receivedBytes = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        if (receivedBytes <= 0) {
+            cout << "CLIENT " << clientIP << ":" << clientPort << " отключился." << endl;
+            close(clientSocket);
+            return;
+        }
 
-    //toClient.str("");
-    //toClient.clear();
-    //toClient << "Введите логин и пароль через пробел: ";
-    //send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+        buffer[receivedBytes] = '\0';
+        string str(buffer);
+        char command = str[0];
 
-    receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
-    if (receivedBytes <= 0) {
-        cout << "CLIENT " << clientIP << ":" << clientPort << " отключился на этапе ввода логина/пароля." << endl;
-        close(clientSocket);
-        return;
-    }
-    int pos0,pos1,pos2;
-    string login,password,code;
-    buffer[receivedBytes] = '\0';
-    string str(buffer);
-    char command = str[0];
-    if(command == '1') {
-        pos0 = str.find('|');
-        pos1 = str.find('|', pos0 + 1);
-    }
-    else{
-        pos0 = str.find('|');        
-        pos1 = str.find('|', pos0 + 1);
-        pos2 = str.find('|', pos1 + 1); 
-    }
-    
-    if(command == '1') {
-        login   = str.substr(pos0 + 1, pos1 - pos0 - 1);
-        password = str.substr(pos1 + 1);
-    }
-    else {
-        login   = str.substr(pos0 + 1, pos1 - pos0 - 1);
-        password = str.substr(pos1 + 1, pos2 - pos1 - 1);
-        code     = str.substr(pos2 + 1); 
-    }
-    cout << "Command: " << command << std::endl;
-    cout << "Login: " << login << std::endl;
-    cout << "Password: " << password << std::endl;
-    cout << "Code: " << code << std::endl; 
+        int pos0, pos1, pos2;
+        string login, password, code;
 
-    if (command == '2') {
-        SaveLoginPasswordToFile(login, password);
-        session.authorized = true;
-        session.username = login;
-        cout << "CLIENT " << clientIP << ":" << clientPort << " зарегистрирован как " << login << endl;
+        if (command == '1') { // вход
+            pos0 = str.find('|');
+            pos1 = str.find('|', pos0 + 1);
+            login = str.substr(pos0 + 1, pos1 - pos0 - 1);
+            password = str.substr(pos1 + 1);
 
-        toClient.str("");
-        toClient.clear();
-        toClient << "\nУспешная регистрация!";
-        send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
-    } else if (command == '1') {
-        if (CheckAuthorization(login, password)) {
-            session.authorized = true;
-            session.username = login;
-            cout << "CLIENT " << clientIP << ":" << clientPort << " авторизовался как " << login << endl;
-            toClient.str("");
-            toClient.clear();
-            toClient << "\nВы подключились. Поздравляем!";
-            send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+            string role;
+            if (CheckAuthorization(login, password, role)) {
+                session.authorized = true;
+                session.username = login;
+                session.role = role;
 
-        } else {
-            toClient.str("");
-            toClient.clear();
-            toClient << "Некорректные данные!";
-            send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
-            cout << "CLIENT " << clientIP << ":" << clientPort << " не прошёл авторизацию." << endl;
+                toClient.str("");
+                toClient.clear();
+                toClient << "\nВы подключились! Ваша роль: " << role << endl;
+
+                send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+
+                cout << "CLIENT " << clientIP << ":" << clientPort
+                    << " авторизовался как " << login << " с ролью " << role << endl;
+            
+            } else {
+                toClient.str("");
+                toClient.clear();
+                toClient << "Некорректные данные! Попробуйте снова.";
+                send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+                cout << "CLIENT " << clientIP << ":" << clientPort << " не прошёл авторизацию." << endl;
+                continue;
+            }
+        }
+        else if (command == '2') { // регистрация
+            pos0 = str.find('|');
+            pos1 = str.find('|', pos0 + 1);
+            pos2 = str.find('|', pos1 + 1);
+            login = str.substr(pos0 + 1, pos1 - pos0 - 1);
+            password = str.substr(pos1 + 1, pos2 - pos1 - 1);
+            code = str.substr(pos2 + 1);
+
+            if (CheckLoginExists(login)) {
+                toClient.str("");
+                toClient.clear();
+                toClient << "Пользователь с таким логином уже существует! Попробуйте другой логин.";
+                send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+                cout << "CLIENT " << clientIP << ":" << clientPort << " попытался зарегистрировать существующий логин: " << login << endl;
+                continue; // ← позволяет клиенту попробовать снова
+            } else {
+                string role;
+                if(!code.empty()) {
+                    string checkCode = HashingFunc(code);
+                    ifstream hashFile("adminCode.bin", ios::binary | ios::app);
+                    int hashLength;
+                    hashFile.read(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
+                    string adminCode(hashLength, '\0');
+                    hashFile.read(&adminCode[0], hashLength);
+                    if(adminCode != checkCode) {
+                        toClient.str("");
+                        toClient.clear();
+                        toClient << "Некорректный код администратора!";
+                        send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+                        cout << "CLIENT " << clientIP << ":" << clientPort << " ввел некорректный код администратора" << endl;
+                        continue; 
+                    }
+                    role = "admin";
+                }
+                else {
+                    role = "user";
+                }
+                session.role = role;
+                SaveLoginPasswordToFile(login, password, role);
+                session.username = login;
+                toClient.str("");
+                toClient.clear();
+                toClient << "\nУспешная регистрация!";
+                send(clientSocket, toClient.str().c_str(), toClient.str().size(), 0);
+                cout << "CLIENT " << clientIP << ":" << clientPort << " зарегистрирован как " << login << endl;
+                continue;
+            }
         }
     }
-    
     CreateTableFromJson("books/books.json");
     CreateTableFromJson("shops/shops.json");
 
     ConceptTable tableBooks("books/books.json");
     ConceptTable tableShops("shops/shops.json");
 
-    // Шаг 2. Работа с базой
     while (true) {
         memset(buffer, 0, sizeof(buffer));
         receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
@@ -158,6 +168,18 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
 
 
 int main() {
+    /*
+    string code = "1906";
+
+    string hashedValue = HashingFunc(code);
+    ofstream codeFile("adminCode.bin", ios::binary | ios::app);
+
+    int hashLength = hashedValue.length();
+
+    codeFile.write(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
+    codeFile.write(hashedValue.c_str(), hashLength);
+    codeFile.close();
+    */
     int serverSocket;
     int clientSocket;
     struct sockaddr_in serverSettings;

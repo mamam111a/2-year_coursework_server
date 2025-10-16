@@ -9,7 +9,7 @@ using json = nlohmann::json;
 json ReadSchema(const string& filepath) {
     ifstream inFile(filepath);
     if (!inFile.is_open()) {
-        cout << "Ошибка открытия файла!" << endl;
+        cout << "Ошибка открытия файла!ыыыы" << endl;
         return json();
     }
 
