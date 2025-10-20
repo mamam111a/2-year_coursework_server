@@ -16,42 +16,69 @@
 using json = nlohmann::json;
 using namespace std;
 #include <sys/socket.h>
-void DeleteTmp() {
-    DeleteTmpInDirectory(".");         
-    DeleteTmpInDirectory("books"); 
-    DeleteTmpInDirectory("shops");
+
+std::string toLower(const std::string& input) {
+    // Устанавливаем русскую локаль для правильной работы с кириллицей
+    std::locale loc("ru_RU.UTF-8");
+
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+    std::wstring wstr = conv.from_bytes(input);
+
+    for (wchar_t& c : wstr) {
+        c = std::tolower(c, loc); // теперь учитывается кириллица
+
+        // заменяем Ё/ё на е
+        if (c == L'ё' || c == L'Ё') {
+            c = L'е';
+        }
+    }
+
+    return conv.to_bytes(wstr);
 }
-bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toClient) {
+bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient) {
     //section|author|name|publisher|publisher_year
     //  0    // 1   // 2 // 3      // 4           
     string query;
+    command = toLower(command);
     vector<string> elements;
     stringstream ss(command);
     string word;
     while (getline(ss, word, '|')) {
         elements.push_back(word);
     }
+
+    int intListShops = elements.size() - 1;
+    string strListShops = elements[intListShops]; 
+    if(strListShops.empty() == false) {
+            if(stoi(strListShops) != 0) {
+            stringstream sss(elements[intListShops]);
+            string number;
+            while (getline(sss, number, ',')) {
+                query += "books.shop_id = '" + number + "' OR ";
+            }
+            query.erase(query.size() - 3);
+            query += "AND ";
+        }
+    }
+    elements.pop_back();
     map<int, string> orElements;
     bool isFoundOR = false;
     for (int i = 0; i < elements.size(); i++) {
-        if (elements[i].find("или") != string::npos || elements[i].find("ИЛИ") != string::npos) {
+        if (elements[i].find("или") != string::npos) {
             orElements[i] = elements[i];
             isFoundOR = true;
         }
     }
+    int countWords = 0;
     vector<int> toSkip;
     if(isFoundOR) {
         for (auto& x : orElements) {
-            int pos;
-            while ((pos = x.second.find("или", pos)) != string::npos) {
-                x.second.replace(pos, 3, "|");
-                pos += 1; 
-            }
-            pos = 0;
-            while ((pos = x.second.find("ИЛИ", pos)) != string::npos) {
-                x.second.replace(pos, 3, "|");
+            int pos = 0;
+            while ((pos = x.second.find(u8"или", pos)) != std::string::npos) {
+                x.second.replace(pos, std::string(u8"или").size(), "|");
                 pos += 1;
             }
+
             int start = x.second.find_first_not_of(" \t");
             int end = x.second.find_last_not_of(" \t");
             if (start != string::npos && end != string::npos)
@@ -61,23 +88,33 @@ bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toCli
             while ((pos = x.second.find("  ", pos)) != string::npos) {
                 x.second.replace(pos, 2, " ");
             }
+
             vector<string> words;
             stringstream ss(x.second);
             string word;
-            while (getline(ss, word, '|')) {  
+            while (getline(ss, word, '|')) {
+                int start = word.find_first_not_of(" \t");
+                int end = word.find_last_not_of(" \t");
+                if (start != string::npos && end != string::npos) 
+                    word = word.substr(start, end - start + 1);  
                 words.push_back(word);
             }
-            query += "books.";
-            if (x.first == 0) query += "section = '" + x.second + "' OR ";
-            else if (x.first == 1) query += "author = '" + x.second + "' OR ";
-            else if (x.first == 2) query += "title = '" + x.second + "' OR ";
-            else if (x.first == 3) query += "publisher = '" + x.second + "' OR ";
-            else if (x.first == 4) query += "publishing_year = '" + x.second + "' OR ";
-            toSkip.push_back(x.first);
+            for(auto& y : words) {
+                query += "books.";
+                if (x.first == 0) query += "section = '" + words[countWords] + "' OR ";
+                else if (x.first == 1) query += "author = '" + words[countWords] + "' OR ";
+                else if (x.first == 2) query += "title = '" + words[countWords] + "' OR ";
+                else if (x.first == 3) query += "publisher = '" + words[countWords] + "' OR ";
+                else if (x.first == 4) query += "publishing_year = '" + words[countWords] + "' OR ";
+                toSkip.push_back(x.first);
+                countWords++;
+            }
+            
 
         }
         query.erase(query.size() - 3); //удаление лишнего OR
     }
+    bool hasAND = false;
     for(int i = 0; i < elements.size(); i++) {
         if(elements[i].empty()) continue;
         bool letsGo = false;
@@ -94,26 +131,24 @@ bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toCli
         if(i == 4) category = "publishing_year";
         if(isFoundOR) query += "AND books." + category + " = '" + elements[i] + "'";
         else query += "books." + category + " = '" + elements[i] + "' AND ";
+        hasAND = true;
     }
-    query.erase(query.size() - 4);
+    if(hasAND) query.erase(query.size() - 4);
     toClient.str("");
     toClient.clear();
     cout << endl << query << endl;
-    if(FindByCriteria(query)) {
-        string message;
+    if (FindByCriteria(query)) {
         ifstream finalFile("finalFile.tmp");
-        string line;
-        while (getline(finalFile, line)) {
-            message += line + " \n ";
-        }
-        toClient << message;
+        ostringstream oss;
+        oss << finalFile.rdbuf(); 
         finalFile.close();
-        DeleteTmp();
+    
+        string message = oss.str(); 
+        toClient << message;    
+    
         return true;
-    }
-    else {
-        DeleteTmp();
-        toClient << "\nНичего не найдено :( ))";
+    } else {
+        toClient << "!Ничего не найдено :( ))";
         return false;
     }
 

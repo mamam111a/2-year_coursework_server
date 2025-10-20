@@ -4,6 +4,6 @@
 #include <string>
 #include <sstream>
 using namespace std;
-bool DBMS_Queries(int& clientSocket, const string& command, ostringstream& toClient);
+bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient);
 
 #endif

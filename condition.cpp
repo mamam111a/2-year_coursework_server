@@ -325,6 +325,7 @@ bool FilteringForOneFile(Condition* condition) {
                     if(!isLineInFile("finalFile.tmp", temp)) {
                         finalCartezianFile << temp << endl;
                         fullness = true;
+                        finalCartezianFile.flush(); 
                     } 
                 }
                 finalCartezianFile.close();
@@ -370,8 +371,10 @@ bool FilteringForOneFile(Condition* condition) {
                         string tempB1 = GetCellByIndex(tempB, targetColumnOrdinary);
                         if(tempB1 == cellA) {
                             if(!isLineInFile("finalFile.tmp", tempA)) {  
+                                
                                 finalCartezianFile << tempA << endl;
                                 fullness = true;
+                                finalCartezianFile.flush(); 
                             }
                         } 
                     }
@@ -392,6 +395,7 @@ bool FilteringForOneFile(Condition* condition) {
                     if(!isLineInFile("finalFile.tmp", temp)) {
                         finalFile << temp << endl;
                         fullness = true;
+                        finalFile.flush(); 
                     }
                     
                 }
@@ -433,6 +437,7 @@ bool FilteringForOneFile(Condition* condition) {
                             if(!isLineInFile("finalFile.tmp", tempCartesian)) {
                                 finalCartezianFile << tempCartesian << endl;
                                 fullness = true;
+                                finalCartezianFile.flush(); 
                             }
                             
                         }
@@ -483,6 +488,7 @@ bool FilteringForOneFile(Condition* condition) {
                         if(!isLineInFile("finalFile.tmp", tempA)) {
                             finalFile << tempA << endl;
                             fullness = true;
+                            finalFile.flush(); 
                         }
                         
                     }
@@ -502,6 +508,7 @@ bool FilteringForOneFile(Condition* condition) {
                             if(!isLineInFile("finalFile.tmp", tempA)) {
                                 finalFile << tempA << endl;
                                 fullness = true;
+                                finalFile.flush(); 
                                 break;
                             }
                              
