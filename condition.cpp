@@ -5,7 +5,7 @@
 #include "headerFiles/condition_additional.h"
 #include "headerFiles/workingCSV.h"
 #include "headerFiles/condition.h"
-
+#include <stack>
 
 using json = nlohmann::json;
 using namespace std;
@@ -62,7 +62,7 @@ Condition* SplitExpressionForStruct(string& filter) {
     return firstElement;
 }
 
-bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount) {
+bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount, string& username) {
     bool isFound = false;
     vector<string> parametersA = {parameters[0], parameters[1]};
     vector<string> parametersB = {parameters[2], parameters[3]};
@@ -71,7 +71,7 @@ bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount) {
     string nameTableB, targetColumnB;
     if(parameters[0] == "books") {
         nameTableA = "books"; targetColumnA = parameters[1];
-        nameTableB = "shops"; targetColumnB = parameters[3];
+        nameTableB = "shops"; targetColumnB = parameters[3]; 
     }
     else {
         nameTableB = "books"; targetColumnB = parameters[1];
@@ -79,7 +79,7 @@ bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount) {
     }
     json jsonDataBooks = ReadSchema(nameTableA + "/" + nameTableA + ".json");
     json jsonDataShops = ReadSchema(nameTableB + "/" + nameTableB + ".json");
-    ofstream finalFileCartesian("SelectFromCartesian_" + to_string(tmpFileCount) + ".tmp", ios::app);
+    ofstream finalFileCartesian("SelectFromCartesian_" + to_string(tmpFileCount) + "_" + username + ".tmp", ios::app);
     int lastCSVBooks;
     ifstream csvFile(nameTableA + "/" + nameTableA + "_list_CSV.txt");
     csvFile >> lastCSVBooks;
@@ -117,7 +117,7 @@ bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount) {
     finalFileCartesian.close();
     return isFound;
 }
-bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian) {
+bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian, string& username) {
     bool isFound = false;
     if(parameters.size() == 3) {
         string nameTable = parameters[0];
@@ -129,7 +129,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
         csvFile.close();
 
         json schema = ReadSchema(nameTable + "/" + nameTable + ".json");
-        ofstream tmpFile(nameTable + "/" + tmpFileName + "_" + to_string(tmpFileCount) + ".tmp", ios::app);
+        ofstream tmpFile(nameTable + "/" + tmpFileName + "_" + to_string(tmpFileCount) + "_" + username +".tmp", ios::app);
 
         for(int i = 1; i <= lastCSV; i++) {
             ifstream inFile(nameTable + "/" + nameTable + "_" + to_string(i) + ".csv");
@@ -172,7 +172,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
             csvFile.close();
 
             json schema = ReadSchema(nameTableA+ "/" + nameTableA + ".json");
-            ofstream tmpFile(nameTableA + "/" + tmpFileName + "_" + to_string(tmpFileCount) + ".tmp", ios::app);
+            ofstream tmpFile(nameTableA + "/" + tmpFileName + "_" + to_string(tmpFileCount) + "_" + username +".tmp", ios::app);
             
             for(int i = 1; i <= lastCSV; i++) {
                 ifstream inFile(nameTableA + "/" + nameTableA + "_" + to_string(i) + ".csv");
@@ -211,14 +211,14 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
         }
         else { 
             hasCartezian = true;
-            if(SelectFromManyTables(parameters, tmpFileCount)) isFound = true;
+            if(SelectFromManyTables(parameters, tmpFileCount,username)) isFound = true;
         }
     }
     return isFound;
 }
 
 
-Condition* ReplacingConditionsWithBool(Condition* expressions) {
+Condition* ReplacingConditionsWithBool(Condition* expressions, string &username) {
     Condition* head = expressions;
     int i = 1;
     while(expressions != nullptr) {
@@ -246,7 +246,7 @@ Condition* ReplacingConditionsWithBool(Condition* expressions) {
             json jsonData = ReadSchema(nameTable + "/" + nameTable + ".json");
             int indexTargetColumn = GetColumnIndex(jsonData,nameTable,nameColumn);
             bool isCartezian = false;
-            if(CheckCondition(parameters, "CheckCondition", i, isCartezian)) {
+            if(CheckCondition(parameters, "CheckCondition", i, isCartezian, username)) {
                 if(isCartezian) expressions->isCartesian = true;
                 expressions->trueOrFalse = true;
                 expressions->targetColumns.push_back(indexTargetColumn);
@@ -273,7 +273,7 @@ Condition* ReplacingConditionsWithBool(Condition* expressions) {
             int indexTargetColumnA = GetColumnIndex(jsonDataA,nameTableA,nameColumnA);
             int indexTargetColumnB = GetColumnIndex(jsonDataB,nameTableB,nameColumnB);
             bool isCartezian = false;
-            if(CheckCondition(parameters, "CheckCondition", i, isCartezian)) {
+            if(CheckCondition(parameters, "CheckCondition", i, isCartezian, username)) {
                 if(isCartezian) expressions->isCartesian = true;
                 expressions->trueOrFalse = true;
                 expressions->targetColumns.push_back(indexTargetColumnA);
@@ -289,13 +289,15 @@ Condition* ReplacingConditionsWithBool(Condition* expressions) {
     return head;
 }
 
-bool FilteringForOneFile(Condition* condition) {
+bool FilteringForOneFile(Condition* condition, string& username) {
     string result;
     Condition* tempHead = condition;
     bool fullness = false;
     bool isFoundOR = ConstFindConditionOper(condition, "OR");
     while(condition != nullptr) {
-        if(condition->oper == "AND" && condition->trueOrFalse == false) { //НУЖНО ПРОВЕРИТЬ НА ЧИСТО ДВА AND
+
+
+        if(condition->oper == "AND" && condition->trueOrFalse == false) { 
             if(isFoundOR == false) return false;
             RemoveConditionByIndex(tempHead, condition->index);
             int tempCond = condition->index + 1;
@@ -318,11 +320,11 @@ bool FilteringForOneFile(Condition* condition) {
         if(tempHead->isCartesian) {
             if(tempHead->oper == "OR" && tempHead->trueOrFalse == 1) {
                 int indexCondition = tempHead->index;
-                ofstream finalCartezianFile("finalFile.tmp", ios::app);
-                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp");
+                ofstream finalCartezianFile("finalFile_" + username + ".tmp", ios::app);
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ "_" + username + ".tmp");
                 string temp;
                 while(getline(cartezianFile, temp)) {
-                    if(!isLineInFile("finalFile.tmp", temp)) {
+                    if(!isLineInFile("finalFile_" + username + ".tmp", temp)) {
                         finalCartezianFile << temp << endl;
                         fullness = true;
                         finalCartezianFile.flush(); 
@@ -344,13 +346,13 @@ bool FilteringForOneFile(Condition* condition) {
                 else if(condition.substr(0,5) == "books" && tempHead->next->condition.substr(0,5) == "shops") targetPartCartesian = 2;
                 else if(condition.substr(0,5) == "shops" && tempHead->next->condition.substr(0,5) == "books") targetPartCartesian = 2;
                 else if(condition.substr(0,5) == "shops" && tempHead->next->condition.substr(0,5) == "shops") targetPartCartesian = 1;
-                ofstream finalCartezianFile("finalFile.tmp", ios::app);
+                ofstream finalCartezianFile("finalFile_" + username + ".tmp", ios::app);
 
                 int indexConditionA = tempHead->index;
                 int indexConditionB = tempHead->next->index;
                 string nameTableB = (tempHead->next->condition).substr(0,5);
-                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionA)+ ".tmp"); 
-                ifstream ordinaryFile(nameTableB + "/" + "CheckCondition_" + to_string(indexConditionB)+ ".tmp"); 
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionA)+ "_" + username +".tmp"); 
+                ifstream ordinaryFile(nameTableB + "/" + "CheckCondition_" + to_string(indexConditionB)+ "_" + username + ".tmp"); 
                 int targetColumnOrdinary = tempHead->targetColumns[0];
                 int targetColumnCartesian;
                 string tempA;
@@ -370,7 +372,7 @@ bool FilteringForOneFile(Condition* condition) {
                     while(getline(ordinaryFile,tempB)) {
                         string tempB1 = GetCellByIndex(tempB, targetColumnOrdinary);
                         if(tempB1 == cellA) {
-                            if(!isLineInFile("finalFile.tmp", tempA)) {  
+                            if(!isLineInFile("finalFile_" + username + ".tmp", tempA)) {  
                                 
                                 finalCartezianFile << tempA << endl;
                                 fullness = true;
@@ -388,11 +390,11 @@ bool FilteringForOneFile(Condition* condition) {
             }
             else if (tempHead->oper == ""){
                 int indexCondition = tempHead->index;
-                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ ".tmp"); 
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ "_" + username + ".tmp"); 
                 ofstream finalFile("finalFile.tmp", ios::app);
                 string temp;
                 while(getline(cartezianFile, temp)) {
-                    if(!isLineInFile("finalFile.tmp", temp)) {
+                    if(!isLineInFile("finalFile_" + username + ".tmp", temp)) {
                         finalFile << temp << endl;
                         fullness = true;
                         finalFile.flush(); 
@@ -412,11 +414,11 @@ bool FilteringForOneFile(Condition* condition) {
                 else nameTable = "shops";
 
                 int targetPartCartesian = (nameTable == "books") ? 1 : 2;
-                ofstream finalCartezianFile("finalFile.tmp", ios::app);
+                ofstream finalCartezianFile("finalFile_" + username + ".tmp", ios::app);
                 int indexConditionOrdinary = tempHead->index;
                 int indexConditionCartesian = tempHead->next->index;
-                ifstream ordinaryFile(nameTable + "/CheckCondition_" + to_string(indexConditionOrdinary) + ".tmp");
-                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionCartesian) + ".tmp");
+                ifstream ordinaryFile(nameTable + "/CheckCondition_" + to_string(indexConditionOrdinary) + "_" + username +".tmp");
+                ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionCartesian) + "_" + username +".tmp");
                 int targetColumnOrdinary = tempHead->targetColumns[0];
                 string tempCartesian;
 
@@ -434,7 +436,7 @@ bool FilteringForOneFile(Condition* condition) {
                     while (getline(ordinaryFile, tempOrdinary)) {
                         string cellFromOrdinary = GetCellByIndex(tempOrdinary, targetColumnOrdinary);
                         if (cellFromOrdinary == cellFromCartesian) {
-                            if(!isLineInFile("finalFile.tmp", tempCartesian)) {
+                            if(!isLineInFile("finalFile_" + username + ".tmp", tempCartesian)) {
                                 finalCartezianFile << tempCartesian << endl;
                                 fullness = true;
                                 finalCartezianFile.flush(); 
@@ -472,9 +474,9 @@ bool FilteringForOneFile(Condition* condition) {
                 count = 2;
 
             }
-            ofstream finalFile("finalFile.tmp", ios::app);
-            ifstream conditionFileA(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionA) + ".tmp");
-            ifstream conditionFileB(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionB) + ".tmp");
+            ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
+            ifstream conditionFileA(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionA) + "_" + username +".tmp");
+            ifstream conditionFileB(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionB) + "_" + username +".tmp");
             if(count == 1) {
                 string tempA;
                 while(getline(conditionFileA,tempA)) {
@@ -485,7 +487,7 @@ bool FilteringForOneFile(Condition* condition) {
                     string cellA =GetCellByIndex(tempA, targetColumnB);
                     string cellB =GetCellByIndex(tempB, targetColumnB);
                     if(cellA == cellB) {
-                        if(!isLineInFile("finalFile.tmp", tempA)) {
+                        if(!isLineInFile("finalFile_" + username + ".tmp", tempA)) {   
                             finalFile << tempA << endl;
                             fullness = true;
                             finalFile.flush(); 
@@ -505,7 +507,7 @@ bool FilteringForOneFile(Condition* condition) {
                     int countPairs = 0;
                     while(getline(ss,cell, ';')) {
                         if(countPairs == 2) {
-                            if(!isLineInFile("finalFile.tmp", tempA)) {
+                            if(!isLineInFile("finalFile_" + username + ".tmp", tempA)) {
                                 finalFile << tempA << endl;
                                 fullness = true;
                                 finalFile.flush(); 
@@ -537,12 +539,12 @@ bool FilteringForOneFile(Condition* condition) {
             int indexCondition = tempHead->index;
 
             
-            ifstream conditionFileA(nameTable + "/" + "CheckCondition_" + to_string(indexCondition) + ".tmp");
+            ifstream conditionFileA(nameTable + "/" + "CheckCondition_" + to_string(indexCondition) + "_" + username +".tmp");
             if(tempHead->trueOrFalse == 1) {
                 string temp;
                 while(getline(conditionFileA,temp)) {
-                    if(isLineInFile("finalFile.tmp", temp) == false) {
-                        ofstream finalFile("finalFile.tmp", ios::app);
+                    if(isLineInFile("finalFile_" + username + ".tmp", temp) == false) {
+                        ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
                         finalFile << temp << endl;
                         fullness = true;
                         finalFile.close();
@@ -563,11 +565,11 @@ bool FilteringForOneFile(Condition* condition) {
     return fullness; 
 }
 
-bool FindByCriteria(string& expression) { //возвращает есть ли ваще что-то подходящее
+bool FindByCriteria(string& expression, string &username) { 
     bool fullness;
     Condition* condition = SplitExpressionForStruct(expression);
-    Condition* newCondition = ReplacingConditionsWithBool(condition);
-    if(FilteringForOneFile(newCondition)) {
+    Condition* newCondition = ReplacingConditionsWithBool(condition,username);
+    if(FilteringForOneFile(newCondition,username)) {
         fullness = true;
     }
     else {

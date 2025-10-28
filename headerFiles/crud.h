@@ -17,14 +17,14 @@ private:
     int FindLastCSV();
     int FindLastLine();
     int GetRowID(const string& str);
+    
+    string username;
 
 public:
-    ConceptTable(const string& path);
+    ConceptTable(const string& path, string& username);
     bool InsertLastRow(vector<string> newLine);
-    bool DeleteLastRow();
-    bool DeleteForCriteria(string criteria);
-    bool DeleteRowByCriteria(string& criteria);
-    bool Correction(string& criteria, string& nameColumn, string newValue);
+    bool DeleteRowByCriteria(string& criteria, string &username);
+    bool Correction(string& criteria, string& nameColumn, string newValue, string &username);
 
 };
 

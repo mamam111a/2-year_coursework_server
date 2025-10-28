@@ -23,7 +23,7 @@ int ConceptTable::FindLastLine() {
     inFile >> count;
     return count;
 }
-ConceptTable::ConceptTable(const string& path) : filePath(path), jsonData(ReadSchema(path)) {
+ConceptTable::ConceptTable(const string& path, string& username) : filePath(path), jsonData(ReadSchema(path)), username(username)  {
     name = jsonData["name"];
     LastLine = FindLastLine();
     lastCSV = FindLastCSV();
@@ -36,18 +36,22 @@ int ConceptTable::GetRowID(const string& str) {
 }
 bool ConceptTable::InsertLastRow(vector<string> newLine) {
     string currFilepath = name + "/" + name + "_" + to_string(lastCSV) + ".csv";
+
     if (LastLine >= tupleLimit) {
         lastCSV++;
         ofstream listCSV(name + "/" + name + "_list_CSV.txt");
+        if (!listCSV.is_open()) return 0; 
         listCSV << to_string(lastCSV);
         listCSV.close();
 
         currFilepath = name + "/" + name + "_" + to_string(lastCSV) + ".csv";
         LastLine = 0; 
     }
+
     int newIndex = 1;
     if (LastLine != 0) {
         ifstream inFile(currFilepath);
+        if (!inFile.is_open()) return 0; 
         string temp, lastRow;
         while (getline(inFile, temp)) {
             lastRow = temp;
@@ -57,6 +61,7 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
     }
 
     ofstream outFile(currFilepath, ios::app);
+    if (!outFile.is_open()) return 0; 
     outFile << to_string(newIndex) + ";";
     for (int i = 0; i < newLine.size(); i++) {
         outFile << newLine[i];
@@ -70,15 +75,17 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
     LastLine = newIndex;
 
     ofstream pkFile(name + "/" + name + "_last_Line.txt");
+    if (!pkFile.is_open()) return 0; 
     pkFile << to_string(LastLine);
     pkFile.close();
-    return 1;
+
+    return 1; // успех
 }
 
-bool ConceptTable::Correction(string& criteria, string& nameColumn, string newValue) {
-    FindByCriteria(criteria); //возможно нужно добавить if else типа вдруг нет изменений
-    string criteriaFilePath = "finalFile.tmp";
-    string tempFilteredPath = name + "/correctedRows.tmp";
+bool ConceptTable::Correction(string& criteria, string& nameColumn, string newValue, string &username) {
+    if(!FindByCriteria(criteria,username)) return false;
+    string criteriaFilePath = "finalFile_" + username + ".tmp";
+    string tempFilteredPath = name + "/correctedRows_" + username + ".tmp";
 
     json jsonData = ReadSchema(name + "/" + name + ".json");
     int columnIndex = GetColumnIndex(jsonData, name, nameColumn);
@@ -87,7 +94,6 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
     ofstream corrected(tempFilteredPath);
     for (int i = 1; i <= lastCSV; i++) {
         string filePath = name + "/" + name + "_" + to_string(i) + ".csv";
-        if (!filesystem::exists(filePath)) continue;
         ifstream inFile(filePath);
         ifstream conditionFile(criteriaFilePath);
         string line, condition;
@@ -108,7 +114,7 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
             while (getline(ss, field, ';')) {
                 fields.push_back(field);
             }
-            if (match && columnIndex < fields.size()) {
+            if (match) {
                 fields[columnIndex-1] = newValue;
             }
             string newLine = to_string(0); 
@@ -148,16 +154,15 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
     tempFile.close();
     filesystem::remove(tempFilteredPath);
 
-    DeleteTmpInDirectory(".");
-    DeleteTmpInDirectory("books");
-    DeleteTmpInDirectory("shops");
 
     return true;
 }
-bool ConceptTable::DeleteRowByCriteria(string& criteria) {
-    FindByCriteria(criteria); //возможно нужно добавить if else типа вдруг нет изменений
-    string criteriaFilePath = "finalFile.tmp";
-    string tempFilteredPath = name + "/filteredRows.tmp";
+bool ConceptTable::DeleteRowByCriteria(string& criteria, string &username) {
+    bool deleted = false;
+    if(FindByCriteria(criteria,username)) deleted = true;
+    else return false;
+    string criteriaFilePath = "finalFile_" + username + ".tmp";
+    string tempFilteredPath = name + "/filteredRows_" + username + ".tmp";
 
     ofstream filtered(tempFilteredPath);
     for (int i = 1; i <= lastCSV; i++) {
@@ -221,9 +226,5 @@ bool ConceptTable::DeleteRowByCriteria(string& criteria) {
     ofstream lastLinefile(name + "/" + name + "_last_Line.txt");
     lastLinefile << ((rowCount == 0) ? tupleLimit : rowCount);
     lastLinefile.close();
-
-    DeleteTmpInDirectory(".");
-    DeleteTmpInDirectory("books");
-    DeleteTmpInDirectory("shops");
-    return true;
+    return deleted;
 }

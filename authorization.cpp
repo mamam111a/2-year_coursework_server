@@ -24,16 +24,10 @@ void SaveLoginPasswordToFile(const string& login, const string& password, const 
     int loginLength = login.length();
     int hashLength = hashedValue.length();
     int roleLength = role.length();
-
-    // записываем логин
     outFile.write(reinterpret_cast<char*>(&loginLength), sizeof(loginLength));
     outFile.write(login.c_str(), loginLength);
-
-    // записываем хэш пароля
     outFile.write(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
     outFile.write(hashedValue.c_str(), hashLength);
-
-    // записываем роль
     outFile.write(reinterpret_cast<char*>(&roleLength), sizeof(roleLength));
     outFile.write(role.c_str(), roleLength);
 
@@ -104,16 +98,16 @@ bool CheckAuthorization(const string& login, const string& password, string& out
 
         if (existingLogin == login) {
             if (storedHash == inputHash) {
-                outRole = storedRole;  // возвращаем роль
+                outRole = storedRole; 
                 inFile.close();
                 return true;
             } else {
                 inFile.close();
-                return false; // пароль неверный
+                return false; 
             }
         }
     }
 
     inFile.close();
-    return false; // логин не найден
+    return false; 
 }

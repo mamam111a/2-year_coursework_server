@@ -11,200 +11,303 @@
 #include "headerFiles/crud.h"
 #include "headerFiles/condition.h"
 #include "headerFiles/condition_additional.h"
-#include "DBMSbody.h"
-
+#include "headerFiles/DBMSbody.h"
+#include <sys/socket.h>
 using json = nlohmann::json;
 using namespace std;
-#include <sys/socket.h>
 
-std::string toLower(const std::string& input) {
-    // Устанавливаем русскую локаль для правильной работы с кириллицей
-    std::locale loc("ru_RU.UTF-8");
+string toLower(const string& input) {
 
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
-    std::wstring wstr = conv.from_bytes(input);
-
+    locale loc("ru_RU.UTF-8");
+    wstring_convert<codecvt_utf8<wchar_t>> conv;
+    wstring wstr = conv.from_bytes(input);
     for (wchar_t& c : wstr) {
-        c = std::tolower(c, loc); // теперь учитывается кириллица
-
-        // заменяем Ё/ё на е
+        c = tolower(c, loc); 
         if (c == L'ё' || c == L'Ё') {
             c = L'е';
         }
     }
-
     return conv.to_bytes(wstr);
 }
-bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient) {
-    //section|author|name|publisher|publisher_year
-    //  0    // 1   // 2 // 3      // 4           
-    string query;
+bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, string& role, string& username) {
     command = toLower(command);
     vector<string> elements;
     stringstream ss(command);
     string word;
+
     while (getline(ss, word, '|')) {
         elements.push_back(word);
     }
+    ConceptTable tableBooks("books/books.json", username);
+    ConceptTable tableShops("shops/shops.json", username);
+    if(role == "user" ) {
+        int intListShops = elements.size() - 1;
+        string strListShops = elements[intListShops];
+        elements.pop_back();
 
-    int intListShops = elements.size() - 1;
-    string strListShops = elements[intListShops]; 
-    if(strListShops.empty() == false) {
-            if(stoi(strListShops) != 0) {
-            stringstream sss(elements[intListShops]);
+        vector<string> andElements;        
+        vector<vector<string>> orElements;  
+        for (int i = 0; i < elements.size(); i++) {
+            if (elements[i].empty()) continue;
+
+            if (elements[i].find(u8"или") != string::npos) {
+                string tmp = elements[i];
+                int pos = 0;
+                while ((pos = tmp.find(u8"или", pos)) != string::npos) {
+                    tmp.replace(pos, string(u8"или").size(), "|");
+                    pos += 1;
+                }
+
+                stringstream ssTmp(tmp);
+                string wordOr;
+                vector<string> orConds;
+
+                while (getline(ssTmp, wordOr, '|')) {
+                    int start = wordOr.find_first_not_of(" \t");
+                    int end = wordOr.find_last_not_of(" \t");
+                    if (start != string::npos && end != string::npos)
+                        wordOr = wordOr.substr(start, end - start + 1);
+
+                    string category;
+                    if(i == 0) category = "section";
+                    else if(i == 1) category = "author";
+                    else if(i == 2) category = "title";
+                    else if(i == 3) category = "publisher";
+                    else if(i == 4) category = "publishing_year";
+
+                    orConds.push_back("books." + category + " = '" + wordOr + "'");
+                }
+                orElements.push_back(orConds);
+            } else {
+                string category;
+                if(i == 0) category = "section";
+                else if(i == 1) category = "author";
+                else if(i == 2) category = "title";
+                else if(i == 3) category = "publisher";
+                else if(i == 4) category = "publishing_year";
+
+                andElements.push_back("books." + category + " = '" + elements[i] + "'");
+            }
+        }
+
+        if (!strListShops.empty() && stoi(strListShops) != 0) {
+            stringstream sss(strListShops);
             string number;
+            vector<string> shopConds;
             while (getline(sss, number, ',')) {
-                query += "books.shop_id = '" + number + "' OR ";
+                shopConds.push_back("books.shop_id = '" + number + "'");
             }
-            query.erase(query.size() - 3);
-            query += "AND ";
+            orElements.insert(orElements.begin(), shopConds); 
         }
-    }
-    elements.pop_back();
-    map<int, string> orElements;
-    bool isFoundOR = false;
-    for (int i = 0; i < elements.size(); i++) {
-        if (elements[i].find("или") != string::npos) {
-            orElements[i] = elements[i];
-            isFoundOR = true;
-        }
-    }
-    int countWords = 0;
-    vector<int> toSkip;
-    if(isFoundOR) {
-        for (auto& x : orElements) {
-            int pos = 0;
-            while ((pos = x.second.find(u8"или", pos)) != std::string::npos) {
-                x.second.replace(pos, std::string(u8"или").size(), "|");
-                pos += 1;
-            }
+        vector<string> combined;
+        combined.push_back("");
 
-            int start = x.second.find_first_not_of(" \t");
-            int end = x.second.find_last_not_of(" \t");
-            if (start != string::npos && end != string::npos)
-                x.second = x.second.substr(start, end - start + 1);
-            
-            pos = 0;
-            while ((pos = x.second.find("  ", pos)) != string::npos) {
-                x.second.replace(pos, 2, " ");
+        for (auto& orBlock : orElements) {
+            vector<string> newCombined;
+            for (auto& prefix : combined) {
+                for (auto& cond : orBlock) {
+                    string tmp = prefix;
+                    if (!tmp.empty()) tmp += " AND ";
+                    tmp += cond;
+                    newCombined.push_back(tmp);
+                }
             }
-
-            vector<string> words;
-            stringstream ss(x.second);
-            string word;
-            while (getline(ss, word, '|')) {
-                int start = word.find_first_not_of(" \t");
-                int end = word.find_last_not_of(" \t");
-                if (start != string::npos && end != string::npos) 
-                    word = word.substr(start, end - start + 1);  
-                words.push_back(word);
-            }
-            for(auto& y : words) {
-                query += "books.";
-                if (x.first == 0) query += "section = '" + words[countWords] + "' OR ";
-                else if (x.first == 1) query += "author = '" + words[countWords] + "' OR ";
-                else if (x.first == 2) query += "title = '" + words[countWords] + "' OR ";
-                else if (x.first == 3) query += "publisher = '" + words[countWords] + "' OR ";
-                else if (x.first == 4) query += "publishing_year = '" + words[countWords] + "' OR ";
-                toSkip.push_back(x.first);
-                countWords++;
-            }
-            
-
+            combined = newCombined;
         }
-        query.erase(query.size() - 3); //удаление лишнего OR
-    }
-    bool hasAND = false;
-    for(int i = 0; i < elements.size(); i++) {
-        if(elements[i].empty()) continue;
-        bool letsGo = false;
-        for(auto& j : toSkip) {
-            if(i == j) letsGo = true;
-            break;
+
+        for (auto& andEl : andElements) {
+            for (auto& s : combined) {
+                if (!s.empty()) s = andEl + " AND " + s;
+                else s = andEl;
+            }
         }
-        if(letsGo) continue;
-        string category;
-        if(i == 0) category = "section";
-        if(i == 1) category = "author";
-        if(i == 2) category = "title";
-        if(i == 3) category = "publisher";
-        if(i == 4) category = "publishing_year";
-        if(isFoundOR) query += "AND books." + category + " = '" + elements[i] + "'";
-        else query += "books." + category + " = '" + elements[i] + "' AND ";
-        hasAND = true;
+        string query = "";
+        for (auto& s : combined) query += s + " OR ";
+        query.erase(query.size() - 4); 
+        toClient.str("");
+        toClient.clear();
+        cout << endl << query << endl;
+
+        if (FindByCriteria(query, username)) {
+            ifstream finalFile("finalFile_" + username + ".tmp");
+            ostringstream oss;
+            oss << finalFile.rdbuf(); 
+            finalFile.close();
+
+            string message = oss.str(); 
+            toClient << "#";
+            toClient << message;    
+
+            return true;
+        } else {
+            toClient << "!Ничего не найдено :( ))";
+            return false;
+        }
     }
-    if(hasAND) query.erase(query.size() - 4);
-    toClient.str("");
-    toClient.clear();
-    cout << endl << query << endl;
-    if (FindByCriteria(query)) {
-        ifstream finalFile("finalFile.tmp");
-        ostringstream oss;
-        oss << finalFile.rdbuf(); 
-        finalFile.close();
+    else {
+        if((elements[0] == "addshops")) {
+            elements.erase(elements.begin());
+            if(tableShops.InsertLastRow(elements)) toClient << "!Строка успешно добавлена!";
+            else toClient << "!Ошибка добавления строки!";
+        }
+        else if (elements[0] == "addbooks") {
+            elements.erase(elements.begin());
+            if(tableBooks.InsertLastRow(elements)) toClient << "!Строка успешно добавлена!";
+            else toClient << "!Ошибка добавления строки!";
+        }
+        else if (elements[0] == "deletebooks") { 
+            string query;
+            elements.erase(elements.begin());
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements[i].empty()) continue;
+                string category;
+                if(i==0) category = "shop_id";
+                else if(i == 1) category = "section";
+                else if(i == 2) category = "author";
+                else if(i == 3) category = "title";
+                else if(i == 4) category = "publisher";
+                else if(i == 5) category = "publishing_year";
+                else if(i == 6) category = "quantity";
+                else if(i == 7) category = "price";
+                else if(i == 8) category = "additional_info";
+                query += "books." + category + " = '" + elements[i] + "' AND ";
+            }
+            query.erase(query.size() - 5);
+            cout << endl << query;
+            if(tableBooks.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
+            else toClient << "!Ошибка удаления!";
+        }
+        else if (elements[0] == "deleteshops") { 
+            string query;
+            elements.erase(elements.begin());
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements[i].empty()) continue;
+                string category;
+                if(i==0) category = "name";
+                else if(i == 1) category = "address";
+                else if(i == 2) category = "working_hours";
+                query += "shops." + category + " = '" + elements[i] + "' AND ";
+            }
+            query.erase(query.size() - 5);
+            cout << endl << query;
+            if(tableShops.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
+            else toClient << "!Ошибка удаления!";
+        }
+        //string& criteria, string& nameColumn, string newValue
+        else if (elements[0] == "updatebooks") {
+            string query, nameColumn, newValue;
+            elements.erase(elements.begin());
+            newValue = elements.back();
+            elements.pop_back();
+            nameColumn = elements.back();
+            elements.pop_back();
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements[i].empty()) continue;
+                string category;
+                if(i==0) category = "shop_id";
+                else if(i == 1) category = "section";
+                else if(i == 2) category = "author";
+                else if(i == 3) category = "title";
+                else if(i == 4) category = "publisher";
+                else if(i == 5) category = "publishing_year";
+                else if(i == 6) category = "quantity";
+                else if(i == 7) category = "price";
+                else if(i == 8) category = "additional_info";
+                query += "books." + category + " = '" + elements[i] + "' AND ";
+            }
+            query.erase(query.size() - 5);
+            cout << endl << query;
+            if(tableBooks.Correction(query,nameColumn,newValue, username)) toClient << "!Успешное обновление!";
+            else toClient << "!Ошибка обновления!";
+        }
+        else if (elements[0] == "updateshops") {
+            string query, nameColumn, newValue;
+            elements.erase(elements.begin());
+            newValue = elements.back();
+            elements.pop_back();
+            nameColumn = elements.back();
+            elements.pop_back();
+
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements[i].empty()) continue;
+                string category;
+                if(i==0) category = "name";
+                else if(i == 1) category = "address";
+                else if(i == 2) category = "working_hours";
+                query += "shops." + category + " = '" + elements[i] + "' AND ";
+            }
+            query.erase(query.size() - 5);
+            cout << endl << query;
+            if(tableShops.Correction(query,nameColumn,newValue,username)) toClient << "!Успешное обновление!";
+            else toClient << "!Ошибка обновления!";
+        }
+        else if (elements[0] == "findbooks") { 
+            string query;
+            elements.erase(elements.begin());
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements[i].empty()) continue;
+                string category;
+                if(i==0) category = "shop_id";
+                else if(i == 1) category = "section";
+                else if(i == 2) category = "author";
+                else if(i == 3) category = "title";
+                else if(i == 4) category = "publisher";
+                else if(i == 5) category = "publishing_year";
+                else if(i == 6) category = "quantity";
+                else if(i == 7) category = "price";
+                else if(i == 8) category = "additional_info";
+                query += "books." + category + " = '" + elements[i] + "' AND ";
+            }
+            query.erase(query.size() - 5);
+            cout << endl << query;
+            if (FindByCriteria(query,username)) {
+                ifstream finalFile("finalFile_" + username + ".tmp");
+                ostringstream oss;
+                oss << finalFile.rdbuf(); 
+                finalFile.close();
+                string message = oss.str();
+                toClient << "#";
+                toClient << message;    
     
-        string message = oss.str(); 
-        toClient << message;    
+                return true;
+            } else {
+                toClient << "!Ничего не найдено :( ))";
+                return false;
+            }
+        }
+        else if (elements[0] == "findshops") { 
+            string query;
+            elements.erase(elements.begin());
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements[i].empty()) continue;
+                string category;
+                if(i==0) category = "name";
+                else if(i == 1) category = "address";
+                else if(i == 2) category = "working_hours";
+                query += "shops." + category + " = '" + elements[i] + "' AND ";
+            }
+            query.erase(query.size() - 5);
+            cout << endl << query;
+
+            if (FindByCriteria(query,username)) {
+                ifstream finalFile("finalFile_" + username + ".tmp");
+                ostringstream oss;
+                oss << finalFile.rdbuf(); 
+                finalFile.close();
+                string message = oss.str();
+                toClient << "%";
+                toClient << message;    
     
-        return true;
-    } else {
-        toClient << "!Ничего не найдено :( ))";
-        return false;
+                return true;
+            } else {
+                toClient << "!Ничего не найдено :( ))";
+                return false;
+            }
+            
+        }
+
     }
-
-
-}
-/*
-    vector<string> v1 = {"4", "Фантастика", "Лев Толстой", "Война и хехе", "Издательство А", "2013", "400", "50", "Хорошее состояние"};
-    vector<string> v2 = {"9", "Фэнтези", "Александр Пушкин", "Евгений хехе", "Издательство Б", "2005", "400", "20", "Как новая"};
-    vector<string> v3 = {"2", "Фэнтези", "Иван Тургенев", "Отцы и дети", "Издательство В", "2021", "500", "20", "С повреждениями"};
-    vector<string> v4 = {"6", "Фэнтези", "Фёдор Достоевский", "Преступление и наказание", "Издательство Г", "2012", "100", "10", "Бестселлер"};
-    vector<string> v5 = {"3", "Фэнтези", "Лев Толстой", "Война и мир", "Издательство Д", "2003", "300", "40", "Как новая"};
-    vector<string> v6 = {"2", "Фэнтези", "Фёдор Достоевский", "Преступление и наказание", "Издательство А", "2018", "500", "30", "С повреждениями"};
-    vector<string> v7 = {"8", "Фантастика", "Антон Чехов", "Чеховские рассказы", "Издательство Б", "2002", "500", "30", "Как новая"};
-    vector<string> v8 = {"1", "Фэнтези", "мамамия", "Война и мир", "Издательство В", "2002", "100", "50", "Бестселлер"};
-    vector<string> v9 = {"1", "Нон-фикшн", "Лев Толстой", "Война и лол", "Издательство В", "2002", "100", "50", "Бестселлер"};
-    vector<string> v10 = {"3", "Фэнтези", "Александр Пушкин", "Евгений Онегин", "Издательство А", "2007", "100", "30", "Как новая"};
-
-    tableBooks.InsertLastRow(v1);
-    tableBooks.InsertLastRow(v2);
-    tableBooks.InsertLastRow(v3);
-    tableBooks.InsertLastRow(v4);
-    tableBooks.InsertLastRow(v5);
-    tableBooks.InsertLastRow(v6);
-    tableBooks.InsertLastRow(v7);
-    tableBooks.InsertLastRow(v8);
-   tableBooks.InsertLastRow(v9);
-    tableBooks.InsertLastRow(v10);
-
-    vector<string> v11 = {"1", "Магазин 1", "Москва, ул. Ленина, 1", "9:00 - 21:00"};
-    vector<string> v21 = {"2", "Магазин 2", "Санкт-Петербург, пр. Невский, 10", "10:00 - 20:00"};
-    vector<string> v31 = {"3", "Магазин 3", "Новосибирск, ул. Кузнецова, 5", "9:30 - 19:30"};
-    vector<string> v41 = {"4", "Магазин 4", "Екатеринбург, ул. Революции, 3", "9:00 - 18:00"};
-    vector<string> v51 = {"5", "Магазин 5", "Казань, ул. Баки Урманче, 7", "10:00 - 22:00"};
-    vector<string> v61 = {"6", "Магазин 6", "Самара, ул. Красноармейская, 12", "9:00 - 20:00"};
-    vector<string> v71 = {"7", "Магазин 7", "Ростов-на-Дону, ул. Садовая, 14", "10:00 - 21:00"};
-    vector<string> v81 = {"8", "Магазин 8", "Красноярск, ул. Дзержинского, 9", "9:00 - 19:00"};
-    vector<string> v91 = {"9", "Магазин 9", "Воронеж, ул. Пушкинская, 15", "10:00 - 18:00"};
-    vector<string> v101 = {"10", "Магазин 10", "Томск, ул. Советская, 20", "9:00 - 22:00"};
-
-    /*tableShops.InsertLastRow(v11);
-    tableShops.InsertLastRow(v21);
-    tableShops.InsertLastRow(v31);
-    tableShops.InsertLastRow(v41);
-    tableShops.InsertLastRow(v51);
-    tableShops.InsertLastRow(v61);
-    tableShops.InsertLastRow(v71);
-    tableShops.InsertLastRow(v81);
-    tableShops.InsertLastRow(v91);
-    tableShops.InsertLastRow(v101);
-
-    string tempstrA = "books.author = 'Лев Толстой'";
-    string nameColumn = "shop_id";
-    string value = "666";
-    //tableBooks.Correction(tempstrA, nameColumn, value);
-    //string tempstrb = "books.title = 'Евгений хехе'";
-    //tableBooks.DeleteRowByCriteria(tempstrA);
-    //tableBooks.DeleteRowByCriteria(tempstrb);
     return true;
-*/
+}
+
+

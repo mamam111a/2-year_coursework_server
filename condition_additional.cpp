@@ -5,21 +5,9 @@
 #include "headerFiles/condition.h"
 #include "headerFiles/crud.h"
 #include "headerFiles/condition_additional.h"
-
-
 using namespace std;
 using json = nlohmann::json;
 
-void PrintFinalFile() {
-    ifstream file("finalFile.tmp");
-    string line;
-    cout << endl << endl;
-    while(getline(file,line)) {
-        cout << line << endl;
-    }
-    cout << endl << endl;
-    file.close();
-}
 void DeleteTmpInDirectory(const string& path) {
     DIR* dir;
     struct dirent* entry;
@@ -34,7 +22,6 @@ void DeleteTmpInDirectory(const string& path) {
                 deleted++;
             }
         }   
-
     }
     closedir(dir);
 }
@@ -83,7 +70,8 @@ int GetColumnIndex(json& schema, string& nameTable, string& nameColumn) {
     auto& columns = schema["structure"][nameTable];
     for (int i = 0; i < columns.size(); i++) {
         if (columns[i] == nameColumn) {
-            return (i + 1);
+            if(nameTable == "books") i++;
+            return i;
         }
     }
     return -1;

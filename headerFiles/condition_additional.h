@@ -8,7 +8,6 @@ using namespace std;
 using json = nlohmann::json;
 
 
-void PrintFinalFile();
 void DeleteTmpInDirectory(const string& path);
 void RemoveConditionByIndex(Condition*& head, int index);
 string GetCellByIndex(const string& row, int index);
