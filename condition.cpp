@@ -6,11 +6,13 @@
 #include "headerFiles/workingCSV.h"
 #include "headerFiles/condition.h"
 #include <stack>
-
+#include <mutex>
+#include "headerFiles/filelocks.h"
 using json = nlohmann::json;
 using namespace std;
 
 Condition* SplitExpressionForStruct(string& filter) {
+    
     Condition* firstElement = nullptr;
     Condition* lastElement = nullptr;
     int begin = 0;
@@ -62,7 +64,8 @@ Condition* SplitExpressionForStruct(string& filter) {
     return firstElement;
 }
 
-bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount, string& username) {
+bool SelectFromManyTables(vector<string>& parameters, const int& tmpFileCount, string& username) {
+
     bool isFound = false;
     vector<string> parametersA = {parameters[0], parameters[1]};
     vector<string> parametersB = {parameters[2], parameters[3]};
@@ -77,26 +80,32 @@ bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount, st
         nameTableB = "books"; targetColumnB = parameters[1];
         nameTableA = "shops"; targetColumnA = parameters[3];
     }
+
     json jsonDataBooks = ReadSchema(nameTableA + "/" + nameTableA + ".json");
     json jsonDataShops = ReadSchema(nameTableB + "/" + nameTableB + ".json");
+
     ofstream finalFileCartesian("SelectFromCartesian_" + to_string(tmpFileCount) + "_" + username + ".tmp", ios::app);
     int lastCSVBooks;
+    lock_guard<recursive_mutex> lock2(GetFileMutex(nameTableA + "/" + nameTableA + "_list_CSV.txt"));
     ifstream csvFile(nameTableA + "/" + nameTableA + "_list_CSV.txt");
     csvFile >> lastCSVBooks;
     csvFile.close();
 
     int lastCSVShops;
+    lock_guard<recursive_mutex> lock3(GetFileMutex(nameTableB + "/" + nameTableB + "_list_CSV.txt"));
     ifstream csvFile1(nameTableB + "/" + nameTableB + "_list_CSV.txt");
     csvFile1 >> lastCSVShops;
     csvFile1.close();
 
     for(int i = 1; i <= lastCSVBooks; i++) {
         string rowBooks;
+        lock_guard<recursive_mutex> lock4(GetFileMutex(nameTableA + "/" + nameTableA + "_" + to_string(i) + ".csv"));
         ifstream fileBooks(nameTableA + "/" + nameTableA + "_" + to_string(i) + ".csv");
         while(getline(fileBooks, rowBooks)) {
             int columnBooks = GetColumnIndex(jsonDataBooks, nameTableA, targetColumnA);
             string cellBooks = GetCellByIndex(rowBooks, columnBooks);
             for(int j = 1; j <= lastCSVShops; j++) {
+                lock_guard<recursive_mutex> lock5(GetFileMutex(nameTableB + "/" + nameTableB + "_" + to_string(j) + ".csv"));
                 ifstream fileShops(nameTableB + "/" + nameTableB + "_" + to_string(j) + ".csv");
                 string rowShops;
                 while(getline(fileShops, rowShops)) {
@@ -118,20 +127,24 @@ bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount, st
     return isFound;
 }
 bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian, string& username) {
+
     bool isFound = false;
     if(parameters.size() == 3) {
         string nameTable = parameters[0];
         string nameColumn = parameters[1];
         string target = parameters[2];
         int lastCSV;
+        lock_guard<recursive_mutex> lock1(GetFileMutex(nameTable + "/" + nameTable + "_list_CSV.txt"));
         ifstream csvFile(nameTable + "/" + nameTable + "_list_CSV.txt");
         csvFile >> lastCSV;
         csvFile.close();
 
         json schema = ReadSchema(nameTable + "/" + nameTable + ".json");
+
         ofstream tmpFile(nameTable + "/" + tmpFileName + "_" + to_string(tmpFileCount) + "_" + username +".tmp", ios::app);
 
         for(int i = 1; i <= lastCSV; i++) {
+            lock_guard<recursive_mutex> lock3(GetFileMutex(nameTable + "/" + nameTable + "_" + to_string(i) + ".csv"));
             ifstream inFile(nameTable + "/" + nameTable + "_" + to_string(i) + ".csv");
             string temp;
             while (getline(inFile, temp)) {
@@ -167,14 +180,18 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
 
         if(nameTableA == nameTableB ) { 
             int lastCSV;
+            lock_guard<recursive_mutex> lock4(GetFileMutex(nameTableA + "/" + nameTableA + "_list_CSV.txt"));
             ifstream csvFile(nameTableA + "/" + nameTableA + "_list_CSV.txt");
             csvFile >> lastCSV;
             csvFile.close();
 
+           
             json schema = ReadSchema(nameTableA+ "/" + nameTableA + ".json");
             ofstream tmpFile(nameTableA + "/" + tmpFileName + "_" + to_string(tmpFileCount) + "_" + username +".tmp", ios::app);
             
             for(int i = 1; i <= lastCSV; i++) {
+
+                lock_guard<recursive_mutex> lock6(GetFileMutex(nameTableA + "/" + nameTableA + "_" + to_string(i) + ".csv"));
                 ifstream inFile(nameTableA + "/" + nameTableA + "_" + to_string(i) + ".csv");
                 string temp;
                 while (getline(inFile, temp)) {
@@ -219,6 +236,7 @@ bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const
 
 
 Condition* ReplacingConditionsWithBool(Condition* expressions, string &username) {
+
     Condition* head = expressions;
     int i = 1;
     while(expressions != nullptr) {
@@ -290,13 +308,12 @@ Condition* ReplacingConditionsWithBool(Condition* expressions, string &username)
 }
 
 bool FilteringForOneFile(Condition* condition, string& username) {
+
     string result;
     Condition* tempHead = condition;
     bool fullness = false;
     bool isFoundOR = ConstFindConditionOper(condition, "OR");
     while(condition != nullptr) {
-
-
         if(condition->oper == "AND" && condition->trueOrFalse == false) { 
             if(isFoundOR == false) return false;
             RemoveConditionByIndex(tempHead, condition->index);
@@ -320,7 +337,12 @@ bool FilteringForOneFile(Condition* condition, string& username) {
         if(tempHead->isCartesian) {
             if(tempHead->oper == "OR" && tempHead->trueOrFalse == 1) {
                 int indexCondition = tempHead->index;
+
+              
+
                 ofstream finalCartezianFile("finalFile_" + username + ".tmp", ios::app);
+
+                
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ "_" + username + ".tmp");
                 string temp;
                 while(getline(cartezianFile, temp)) {
@@ -351,8 +373,11 @@ bool FilteringForOneFile(Condition* condition, string& username) {
                 int indexConditionA = tempHead->index;
                 int indexConditionB = tempHead->next->index;
                 string nameTableB = (tempHead->next->condition).substr(0,5);
+
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionA)+ "_" + username +".tmp"); 
                 ifstream ordinaryFile(nameTableB + "/" + "CheckCondition_" + to_string(indexConditionB)+ "_" + username + ".tmp"); 
+
+
                 int targetColumnOrdinary = tempHead->targetColumns[0];
                 int targetColumnCartesian;
                 string tempA;
@@ -391,7 +416,7 @@ bool FilteringForOneFile(Condition* condition, string& username) {
             else if (tempHead->oper == ""){
                 int indexCondition = tempHead->index;
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexCondition)+ "_" + username + ".tmp"); 
-                ofstream finalFile("finalFile.tmp", ios::app);
+                ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
                 string temp;
                 while(getline(cartezianFile, temp)) {
                     if(!isLineInFile("finalFile_" + username + ".tmp", temp)) {
@@ -414,11 +439,16 @@ bool FilteringForOneFile(Condition* condition, string& username) {
                 else nameTable = "shops";
 
                 int targetPartCartesian = (nameTable == "books") ? 1 : 2;
+
+
                 ofstream finalCartezianFile("finalFile_" + username + ".tmp", ios::app);
                 int indexConditionOrdinary = tempHead->index;
                 int indexConditionCartesian = tempHead->next->index;
+
                 ifstream ordinaryFile(nameTable + "/CheckCondition_" + to_string(indexConditionOrdinary) + "_" + username +".tmp");
                 ifstream cartezianFile("SelectFromCartesian_" + to_string(indexConditionCartesian) + "_" + username +".tmp");
+
+
                 int targetColumnOrdinary = tempHead->targetColumns[0];
                 string tempCartesian;
 
@@ -474,6 +504,7 @@ bool FilteringForOneFile(Condition* condition, string& username) {
                 count = 2;
 
             }
+           
             ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
             ifstream conditionFileA(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionA) + "_" + username +".tmp");
             ifstream conditionFileB(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionB) + "_" + username +".tmp");
@@ -538,7 +569,7 @@ bool FilteringForOneFile(Condition* condition, string& username) {
             else nameTable = "shops";
             int indexCondition = tempHead->index;
 
-            
+          
             ifstream conditionFileA(nameTable + "/" + "CheckCondition_" + to_string(indexCondition) + "_" + username +".tmp");
             if(tempHead->trueOrFalse == 1) {
                 string temp;

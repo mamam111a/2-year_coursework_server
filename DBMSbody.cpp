@@ -12,23 +12,14 @@
 #include "headerFiles/condition.h"
 #include "headerFiles/condition_additional.h"
 #include "headerFiles/DBMSbody.h"
+#include "headerFiles/server_additional.h"
 #include <sys/socket.h>
+#include <mutex>
+#include "headerFiles/filelocks.h"
 using json = nlohmann::json;
 using namespace std;
 
-string toLower(const string& input) {
 
-    locale loc("ru_RU.UTF-8");
-    wstring_convert<codecvt_utf8<wchar_t>> conv;
-    wstring wstr = conv.from_bytes(input);
-    for (wchar_t& c : wstr) {
-        c = tolower(c, loc); 
-        if (c == L'ё' || c == L'Ё') {
-            c = L'е';
-        }
-    }
-    return conv.to_bytes(wstr);
-}
 bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, string& role, string& username) {
     command = toLower(command);
     vector<string> elements;
@@ -126,7 +117,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
         query.erase(query.size() - 4); 
         toClient.str("");
         toClient.clear();
-        cout << endl << query << endl;
 
         if (FindByCriteria(query, username)) {
             ifstream finalFile("finalFile_" + username + ".tmp");
@@ -173,7 +163,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 query += "books." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
-            cout << endl << query;
             if(tableBooks.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
             else toClient << "!Ошибка удаления!";
         }
@@ -189,7 +178,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
-            cout << endl << query;
             if(tableShops.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
             else toClient << "!Ошибка удаления!";
         }
@@ -216,7 +204,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 query += "books." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
-            cout << endl << query;
             if(tableBooks.Correction(query,nameColumn,newValue, username)) toClient << "!Успешное обновление!";
             else toClient << "!Ошибка обновления!";
         }
@@ -237,7 +224,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
-            cout << endl << query;
             if(tableShops.Correction(query,nameColumn,newValue,username)) toClient << "!Успешное обновление!";
             else toClient << "!Ошибка обновления!";
         }
@@ -259,7 +245,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 query += "books." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
-            cout << endl << query;
             if (FindByCriteria(query,username)) {
                 ifstream finalFile("finalFile_" + username + ".tmp");
                 ostringstream oss;
@@ -287,8 +272,6 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
-            cout << endl << query;
-
             if (FindByCriteria(query,username)) {
                 ifstream finalFile("finalFile_" + username + ".tmp");
                 ostringstream oss;

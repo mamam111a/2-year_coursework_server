@@ -6,18 +6,20 @@
 #include "headerFiles/condition.h"
 #include "headerFiles/crud.h"
 #include "headerFiles/condition_additional.h"
-
+#include <mutex>
+#include "headerFiles/filelocks.h"
 using namespace std;
 using json = nlohmann::json;
 
-
 int ConceptTable::FindLastCSV() {
+    lock_guard<recursive_mutex> lock(GetFileMutex(name + "/" + name + "_list_CSV.txt"));
     ifstream inFile(name + "/" + name + "_list_CSV.txt");
     int count;
     inFile >> count;
     return count;
 }
 int ConceptTable::FindLastLine() {
+    lock_guard<recursive_mutex> lock(GetFileMutex(name + "/" + name + "_last_Line.txt"));
     ifstream inFile(name + "/" + name + "_last_Line.txt");
     int count;
     inFile >> count;
@@ -34,11 +36,13 @@ int ConceptTable::GetRowID(const string& str) {
     string temp = str.substr(0, pos);
     return stoi(temp);    
 }
-bool ConceptTable::InsertLastRow(vector<string> newLine) {
+bool ConceptTable::InsertLastRow(vector<string>& newLine) {
+    lock_guard<recursive_mutex> lock(GetFileMutex(name + "/" + name + "_" + to_string(lastCSV) + ".csv"));
     string currFilepath = name + "/" + name + "_" + to_string(lastCSV) + ".csv";
 
     if (LastLine >= tupleLimit) {
         lastCSV++;
+        lock_guard<recursive_mutex> lock1(GetFileMutex(name + "/" + name + "_list_CSV.txt"));
         ofstream listCSV(name + "/" + name + "_list_CSV.txt");
         if (!listCSV.is_open()) return 0; 
         listCSV << to_string(lastCSV);
@@ -50,6 +54,7 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
 
     int newIndex = 1;
     if (LastLine != 0) {
+        lock_guard<recursive_mutex> lock2(GetFileMutex(currFilepath));
         ifstream inFile(currFilepath);
         if (!inFile.is_open()) return 0; 
         string temp, lastRow;
@@ -59,7 +64,7 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
         inFile.close();
         newIndex = GetRowID(lastRow) + 1;
     }
-
+    lock_guard<recursive_mutex> lock3(GetFileMutex(currFilepath));
     ofstream outFile(currFilepath, ios::app);
     if (!outFile.is_open()) return 0; 
     outFile << to_string(newIndex) + ";";
@@ -73,7 +78,7 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
     outFile.close();
 
     LastLine = newIndex;
-
+    lock_guard<recursive_mutex> lock4(GetFileMutex(name + "/" + name + "_last_Line.txt"));
     ofstream pkFile(name + "/" + name + "_last_Line.txt");
     if (!pkFile.is_open()) return 0; 
     pkFile << to_string(LastLine);
@@ -82,7 +87,8 @@ bool ConceptTable::InsertLastRow(vector<string> newLine) {
     return 1; // успех
 }
 
-bool ConceptTable::Correction(string& criteria, string& nameColumn, string newValue, string &username) {
+bool ConceptTable::Correction(string& criteria, string& nameColumn, string& newValue, string &username) {
+
     if(!FindByCriteria(criteria,username)) return false;
     string criteriaFilePath = "finalFile_" + username + ".tmp";
     string tempFilteredPath = name + "/correctedRows_" + username + ".tmp";
@@ -93,6 +99,7 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
 
     ofstream corrected(tempFilteredPath);
     for (int i = 1; i <= lastCSV; i++) {
+        lock_guard<recursive_mutex> lock3(GetFileMutex(name + "/" + name + "_" + to_string(i) + ".csv"));
         string filePath = name + "/" + name + "_" + to_string(i) + ".csv";
         ifstream inFile(filePath);
         ifstream conditionFile(criteriaFilePath);
@@ -128,7 +135,6 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
         filesystem::remove(filePath);
     }
     corrected.close();
-
     ifstream tempFile(tempFilteredPath);
     int index = 1;
     int rowCount = 0;
@@ -137,7 +143,10 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
     bool fileOpen = false;
     while (getline(tempFile, line)) {
         if (rowCount == 0) {
+
             string newPath = name + "/" + name + "_" + to_string(index) + ".csv";
+
+            lock_guard<recursive_mutex> lock5(GetFileMutex(newPath));
             newFile.open(newPath);
             fileOpen = true;
         }
@@ -158,9 +167,11 @@ bool ConceptTable::Correction(string& criteria, string& nameColumn, string newVa
     return true;
 }
 bool ConceptTable::DeleteRowByCriteria(string& criteria, string &username) {
+   
     bool deleted = false;
     if(FindByCriteria(criteria,username)) deleted = true;
     else return false;
+
     string criteriaFilePath = "finalFile_" + username + ".tmp";
     string tempFilteredPath = name + "/filteredRows_" + username + ".tmp";
 
@@ -169,6 +180,8 @@ bool ConceptTable::DeleteRowByCriteria(string& criteria, string &username) {
         string filePath = name + "/" + name + "_" + to_string(i) + ".csv";
         if (!filesystem::exists(filePath)) continue;
         ifstream inFile(filePath);
+        lock_guard<recursive_mutex> lock3(GetFileMutex(filePath));
+
         ifstream conditionFile(criteriaFilePath);
         string line;
         string condition;
@@ -202,6 +215,7 @@ bool ConceptTable::DeleteRowByCriteria(string& criteria, string &username) {
     while (getline(tempFile, line)) {
         if (rowCount == 0) {
             string newPath = name + "/" + name + "_" + to_string(index) + ".csv";
+            lock_guard<recursive_mutex> lock5(GetFileMutex(newPath));
             newFile.open(newPath);
             fileOpen = true;
         }
@@ -219,10 +233,11 @@ bool ConceptTable::DeleteRowByCriteria(string& criteria, string &username) {
     filesystem::remove(tempFilteredPath);
     if (rowCount == 0) lastCSV = index - 1;
     else lastCSV = index;
-    
+    lock_guard<recursive_mutex> lock6(GetFileMutex(name + "/" + name + "_list_CSV.txt"));
     ofstream lastCSVfile(name + "/" + name + "_list_CSV.txt");
     lastCSVfile << lastCSV;
     lastCSVfile.close();
+    lock_guard<recursive_mutex> lock7(GetFileMutex(name + "/" + name + "_last_Line.txt"));
     ofstream lastLinefile(name + "/" + name + "_last_Line.txt");
     lastLinefile << ((rowCount == 0) ? tupleLimit : rowCount);
     lastLinefile.close();

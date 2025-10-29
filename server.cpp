@@ -2,6 +2,7 @@
 #include "headerFiles/DBMSbody.h"
 #include "headerFiles/crud.h"
 #include "headerFiles/workingCSV.h"
+#include "headerFiles/server_additional.h"
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
@@ -12,49 +13,12 @@
 #include <sstream>
 #include <csignal>
 #include <thread>
-
+#include <mutex>
 #include "headerFiles/condition_additional.h"
+#include <format>
+#include "headerFiles/filelocks.h"
 using namespace std;
 
-bool running = true;
-
-void SignalCheck(int signal) {
-    if (signal == SIGINT) {
-        running = false;
-    }
-}
-struct ClientSession {
-    bool authorized = false;
-    string username;
-    string role;
-};
-void DeleteTmp() {
-    DeleteTmpInDirectory(".");         
-    DeleteTmpInDirectory("books"); 
-    DeleteTmpInDirectory("shops");
-}
-
-bool SendMessage(int clientSocket, const string &message) {
-    uint32_t len = message.size();
-    uint32_t len_net = htonl(len);
-    vector<char> sendBuffer(sizeof(len_net) + len);
-    memcpy(sendBuffer.data(), &len_net, sizeof(len_net));
-    memcpy(sendBuffer.data() + sizeof(len_net), message.data(), len);
-
-    int totalSent = 0;
-    int sendSize = sendBuffer.size();
-
-    while (totalSent < sendSize) {
-        int sent = send(clientSocket, sendBuffer.data() + totalSent, sendSize - totalSent, 0);
-        if (sent <= 0) {
-            cerr << "Ошибка отправки данных клиенту!" << endl;
-            return false;
-        }
-        totalSent += sent;
-    }
-
-    return true;
-}
 
 void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
     char buffer[1024];
@@ -66,16 +30,12 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
 
     while (true) { 
         while (!session.authorized) {
-            memset(buffer, 0, sizeof(buffer));
-            receivedBytes = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-            if (receivedBytes <= 0) {
-                cout << "CLIENT " << clientIP << ":" << clientPort << " отключился." << endl;
+            string str;
+            if (!ReceiveMessage(clientSocket, str)) {
+                Log("CLIENT " + clientIP + ":" + to_string(clientPort) + " отключился.") ;
                 close(clientSocket);
                 return;
             }
-
-            buffer[receivedBytes] = '\0';
-            string str(buffer);
             char command = str[0];
 
             int pos0, pos1, pos2;
@@ -95,10 +55,12 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
 
                     toClient.str("");
                     toClient.clear();
+                    Log("SERVER to CLIENT " + clientIP + ":" + to_string(clientPort) + " ==>> !Вы подключились! Ваша роль: " + role);
                     toClient << "\n!Вы подключились! Ваша роль: " << role;
                     SendMessage(clientSocket, toClient.str());
 
                     if(role == "user") {
+                        lock_guard<recursive_mutex> lock(GetFileMutex("shops/shops_list_CSV.txt"));
                         ifstream inFile("shops/shops_list_CSV.txt");
                         if (inFile.is_open()) {
                             int countShopsCSV;
@@ -107,6 +69,7 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                             sss << "*";
 
                             for (int i = 1; i <= countShopsCSV; i++) {
+                                lock_guard<recursive_mutex> lock(GetFileMutex("shops/shops_" + to_string(i) + ".csv"));
                                 ifstream shopFile("shops/shops_" + to_string(i) + ".csv");
                                 string row;
                                 while (getline(shopFile, row)) {
@@ -117,14 +80,14 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                             SendMessage(clientSocket, sss.str());
                         }
                     }
-                    cout << "CLIENT " << clientIP << ":" << clientPort
-                         << " авторизовался как " << login << " с ролью " << role << endl;
+                    Log( "CLIENT " + clientIP + ":" + to_string(clientPort) + " авторизовался | login: " + login + " | role: " + role);
                 } else {
                     toClient.str("");
                     toClient.clear();
                     toClient << "!Некорректные данные! Попробуйте снова.";
+                    Log("SERVER to CLIENT " + clientIP + ":" + to_string(clientPort) + " ==>> !Некорректные данные! Попробуйте снова. ");
                     SendMessage(clientSocket, toClient.str());
-                    cout << "CLIENT " << clientIP << ":" << clientPort << " не прошёл авторизацию." << endl;
+                    Log("CLIENT " + clientIP + ":" + to_string(clientPort) + " не прошел авторизацию.") ;
                     continue; 
                 }
             }
@@ -140,13 +103,15 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                     toClient.str("");
                     toClient.clear();
                     toClient << "!Пользователь с таким логином уже существует! Попробуйте другой логин.";
+                    Log("SERVER to CLIENT "+ clientIP + ":" + to_string(clientPort) +" ==>> !Пользователь с таким логином уже существует! Попробуйте другой логин. ");
                     SendMessage(clientSocket, toClient.str());
-                    cout << "CLIENT " << clientIP << ":" << clientPort << " попытался зарегистрировать существующий логин: " << login << endl;
+                    Log("CLIENT " + clientIP + ":" + to_string(clientPort) + " попытался зарегистрировать существующий логин: " + login) ;
                     continue;
                 } else {
                     string role;
                     if(!code.empty()) {
                         string checkCode = HashingFunc(code);
+                        lock_guard<recursive_mutex> lock(GetFileMutex("adminCode.bin"));
                         ifstream hashFile("adminCode.bin", ios::binary | ios::app);
                         int hashLength;
                         hashFile.read(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
@@ -156,10 +121,12 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                             toClient.str("");
                             toClient.clear();
                             toClient << "!Некорректный код администратора!";
+                            Log("SERVER to CLIENT "+ clientIP + ":" + to_string(clientPort) +" ==>> !Некорректный код администратора!");
                             SendMessage(clientSocket, toClient.str());
-                            cout << "CLIENT " << clientIP << ":" << clientPort << " ввел некорректный код администратора" << endl;
+                            Log("CLIENT " + clientIP + ":" + to_string(clientPort) + " ввел некорректный код администратора: " + code) ;
                             continue; 
                         }
+                        hashFile.close();
                         role = "admin";
                     } else {
                         role = "user";
@@ -169,51 +136,36 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                     session.username = login;
                     toClient.str("");
                     toClient.clear();
+                    Log("SERVER to CLIENT " + clientIP + ":" + to_string(clientPort) +" ==>> !Успешная регистрация!");
                     toClient << "!Успешная регистрация!";
                     SendMessage(clientSocket, toClient.str());
-                    cout << "CLIENT " << clientIP << ":" << clientPort << " зарегистрирован как " << login << endl;
+                    Log( "CLIENT " + clientIP + ":" + to_string(clientPort) + " зарегистрировался | login: " + login + " | role: " + role);
                     continue;
                 }
             }
         }
 
         while (session.authorized) {
-            memset(buffer, 0, sizeof(buffer));
-            receivedBytes = recv(clientSocket, buffer, sizeof(buffer)-1, 0);
-            if (receivedBytes <= 0) {
-                cout << "CLIENT " << clientIP << ":" << clientPort << " отключился." << endl;
-                close(clientSocket);
+            string command;
+            if(!ReceiveMessage(clientSocket, command)) {
+                Log("CLIENT " + clientIP + ":" + to_string(clientPort) + ":" +session.username + ":" + session.role + " отключился.") ;
+                close(clientSocket); 
                 return;
             }
-            buffer[receivedBytes] = '\0';
-            string command(buffer);
             if (command == "0|logout") {
-                cout << "CLIENT " << clientIP << ":" << clientPort << " вышел." << endl;
+                Log("CLIENT " + clientIP + ":" + to_string(clientPort) + ":" + session.username + ":" + session.role + " вышел из аккаунта.") ;
                 session.authorized = false;
                 break; 
             }
-            cout << "CLIENT " << clientIP << ":" << clientPort << " -> " << command << endl;
+            if (command == "OK") {
+                DeleteTmp();
+                continue;
+            }
+            Log("CLIENT " + clientIP + ":" + to_string(clientPort) + ":" + session.username + ":" + session.role + " отправил запрос ==>> " + command) ;
             toClient.str("");
             toClient.clear();
             DBMS_Queries(clientSocket, command, toClient, session.role, session.username);
-            string response = toClient.str();
-            uint32_t len = response.size();
-            uint32_t len_net = htonl(len);
-            vector<char> sendBuffer(sizeof(len_net) + len);
-            memcpy(sendBuffer.data(), &len_net, sizeof(len_net));
-            memcpy(sendBuffer.data() + sizeof(len_net), response.data(), len);
-            int totalSent = 0;
-            int sendSize = sendBuffer.size();
-            while (totalSent < sendSize) {
-                int sent = send(clientSocket, sendBuffer.data() + totalSent, sendSize - totalSent, 0);
-                if (sent <= 0) {
-                    cout << "Ошибка отправки данных клиенту " << clientIP << ":" << clientPort << endl;
-                    break;
-                }
-                totalSent += sent;
-            }
-            this_thread::sleep_for(chrono::milliseconds(3000));
-            DeleteTmp();
+            SendMessage(clientSocket, toClient.str());
         }
     }
 }
@@ -222,19 +174,15 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
 int main() {
     /*
     string code = "1906";
-
     string hashedValue = HashingFunc(code);
     ofstream codeFile("adminCode.bin", ios::binary | ios::app);
-
     int hashLength = hashedValue.length();
-
     codeFile.write(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
     codeFile.write(hashedValue.c_str(), hashLength);
     codeFile.close();
     */
     CreateTableFromJson("books/books.json");
     CreateTableFromJson("shops/shops.json");
-
 
     int serverSocket;
     int clientSocket;
@@ -244,7 +192,7 @@ int main() {
 
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket < 0) {
-        cout << "SERVER: Ошибка создания сокета!!!" << endl;
+        Log("SERVER: Ошибка создания сокета!");
         return 0;
     }
 
@@ -254,24 +202,24 @@ int main() {
 
     int opt = 1;
     if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        perror("SERVER: Ошибка установки SO_REUSEADDR");
+        Log("SERVER: Ошибка установки SO_REUSEADDR");
         close(serverSocket);
         return 0;
     }
 
     if (bind(serverSocket, (struct sockaddr*)&serverSettings, sizeof(serverSettings)) < 0) {
-        perror("SERVER: Ошибка привязки сокета");
+        Log("SERVER: Ошибка привязки сокета");
         close(serverSocket);
         return 0;
     }
 
     if (listen(serverSocket, 5) < 0) {
-        cout << "SERVER: Ошибка прослушивания на сокете!!!" << endl;
+        Log("SERVER: Ошибка прослушивания на сокете!");
         close(serverSocket);
         return 0;
     }
 
-    cout << "\nSERVER: Ожидание подключения (port 7432)" << endl;
+    Log("SERVER: СЕРВЕР ЗАПУЩЕН!");
 
     signal(SIGINT, SignalCheck);
 
@@ -279,7 +227,7 @@ int main() {
         clientSocket = accept(serverSocket, (struct sockaddr*)&clientSettings, &clientSetLen);
         if (clientSocket < 0) {
             if (!running) break;
-            cout << "SERVER: Ошибка подключения клиента!" << endl;
+            Log("SERVER: Ошибка подключения клиента!");
             continue;
         }
 
@@ -287,12 +235,12 @@ int main() {
         inet_ntop(AF_INET, &clientSettings.sin_addr, clientIP, INET_ADDRSTRLEN);
         int clientPort = ntohs(clientSettings.sin_port);
 
-        cout << "SERVER: Подключился клиент " << clientIP << ":" << clientPort << endl;
+        Log("SERVER: Подключился клиент " + string(clientIP) + ":" + to_string(clientPort));
         thread t(ConnectionProcessing, clientSocket, string(clientIP), clientPort);
         t.detach();
     }
 
     close(serverSocket);
-    cout << "SERVER: Завершение работы." << endl;
+    Log("SERVER: Завершение работы.");
     return 0;
 }

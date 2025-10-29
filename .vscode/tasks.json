@@ -15,6 +15,8 @@
                 "crud.cpp",
                 "workingCSV.cpp",
                 "DBMSbody.cpp",
+                "server_additional.cpp",
+                "filelocks.cpp",
                 "-o",
                 "server",
                 "-lssl",

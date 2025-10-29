@@ -5,7 +5,10 @@
 #include <sstream>
 #include "headerFiles/authorization.h"
 #include <iomanip>
+#include <mutex>
+#include "headerFiles/filelocks.h"
 using namespace std;
+
 
 string HashingFunc(const string& password) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -18,7 +21,9 @@ string HashingFunc(const string& password) {
 }
 
 void SaveLoginPasswordToFile(const string& login, const string& password, const string& role) {
+    lock_guard<std::recursive_mutex> lock(GetFileMutex("authorization/authorization.bin"));
     string hashedValue = HashingFunc(password);
+ 
     ofstream outFile("authorization/authorization.bin", ios::binary | ios::app);
 
     int loginLength = login.length();
@@ -34,6 +39,7 @@ void SaveLoginPasswordToFile(const string& login, const string& password, const 
     outFile.close();
 }
 bool ReadFromFile(const string& targetHash) {
+    lock_guard<std::recursive_mutex> lock(GetFileMutex("authorization/authorization.bin"));
     ifstream inFile("authorization/authorization.bin",  ios::binary);
     while (!inFile.eof()) {
         int length;
@@ -49,6 +55,7 @@ bool ReadFromFile(const string& targetHash) {
     return 0;
 }
 bool CheckLoginExists(const string& login) {
+    lock_guard<std::recursive_mutex> lock(GetFileMutex("authorization/authorization.bin"));
     ifstream inFile("authorization/authorization.bin", ios::binary);
     if (!inFile.is_open()) return false;
 
@@ -74,6 +81,7 @@ bool CheckLoginExists(const string& login) {
     return false;
 }
 bool CheckAuthorization(const string& login, const string& password, string& outRole) {
+    lock_guard<std::recursive_mutex> lock(GetFileMutex("authorization/authorization.bin"));
     ifstream inFile("authorization/authorization.bin", ios::binary);
     if (!inFile.is_open()) return false;
 

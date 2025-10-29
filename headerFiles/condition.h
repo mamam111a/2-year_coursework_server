@@ -17,7 +17,7 @@ struct Condition {
 };
 
 Condition* SplitExpressionForStruct(string& filter);
-bool SelectFromManyTables(vector<string> parameters, const int& tmpFileCount, string &username);
+bool SelectFromManyTables(vector<string>& parameters, const int& tmpFileCount, string &username);
 bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian, string &username);
 Condition* ReplacingConditionsWithBool(Condition* expressions, string &username);
 bool FilteringForOneFile(Condition* condition, string &username);

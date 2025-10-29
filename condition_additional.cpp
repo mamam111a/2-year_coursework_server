@@ -5,10 +5,17 @@
 #include "headerFiles/condition.h"
 #include "headerFiles/crud.h"
 #include "headerFiles/condition_additional.h"
+#include "headerFiles/filelocks.h"
 using namespace std;
 using json = nlohmann::json;
 
+recursive_mutex& GetDirMutex(const string& dirPath) {
+    static map<string, recursive_mutex> dirMutexes;
+    return dirMutexes[dirPath]; 
+}
+
 void DeleteTmpInDirectory(const string& path) {
+    lock_guard<recursive_mutex> lock(GetDirMutex(path));
     DIR* dir;
     struct dirent* entry;
     int deleted = 0;
@@ -25,7 +32,8 @@ void DeleteTmpInDirectory(const string& path) {
     }
     closedir(dir);
 }
-void RemoveConditionByIndex(Condition*& head, int index) {
+void RemoveConditionByIndex(Condition*& head, int& index) {
+    
     Condition* curr = head;
     Condition* prev = nullptr;
     if (curr == nullptr) return;
@@ -99,7 +107,6 @@ Condition* ConstFindConditionOper(const Condition* head, const string& oper) {
     }
     return nullptr; 
 }
-
 
 int GetSizeCondition(Condition* head) {
     int size = 0;
