@@ -14,8 +14,10 @@
 #include "headerFiles/condition_additional.h"
 #include "headerFiles/filelocks.h"
 using namespace std;
-bool running = true;
 const string logFileName = "server_log.txt";
+
+atomic<bool> running = true; 
+int serverSocket = -1;
 
 void Log(const string& message) {
     lock_guard<recursive_mutex> lock(GetFileMutex(logFileName));
@@ -31,10 +33,13 @@ void Log(const string& message) {
 void SignalCheck(int signal) {
     if (signal == SIGINT || signal == SIGHUP) {
         running = false;
-        Log("SERVER: Получен сигнал завершения (" + to_string(signal) + ")");
+        if (serverSocket != -1) {
+            close(serverSocket);
+            serverSocket = -1;
+            Log("SERVER: Получен сигнал завершения (" + to_string(signal) + "), сокет закрыт");
+        }
     }
 }
-
 void DeleteTmp(const string& username) {
     DeleteTmpInDirectory(".", username);         
     DeleteTmpInDirectory("books", username); 

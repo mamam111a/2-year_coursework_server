@@ -1,8 +1,4 @@
-#include "headerFiles/authorization.h"
-#include "headerFiles/DBMSbody.h"
-#include "headerFiles/crud.h"
-#include "headerFiles/workingCSV.h"
-#include "headerFiles/server_additional.h"
+
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
@@ -14,11 +10,17 @@
 #include <csignal>
 #include <thread>
 #include <mutex>
-#include "headerFiles/condition_additional.h"
 #include <format>
+#include <atomic>
+#include "headerFiles/authorization.h"
+#include "headerFiles/DBMSbody.h"
+#include "headerFiles/crud.h"
+#include "headerFiles/workingCSV.h"
+#include "headerFiles/server_additional.h"
 #include "headerFiles/filelocks.h"
-using namespace std;
+#include "headerFiles/condition_additional.h"
 
+using namespace std;
 
 void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
     char buffer[1024];
@@ -184,7 +186,6 @@ int main() {
     CreateTableFromJson("books/books.json");
     CreateTableFromJson("shops/shops.json");
 
-    int serverSocket;
     int clientSocket;
     struct sockaddr_in serverSettings;
     struct sockaddr_in clientSettings;

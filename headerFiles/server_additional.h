@@ -1,11 +1,12 @@
 
 #ifndef SERVER_ADDITIONAL_H
 #define SERVER_ADDITIONAL_H
-
+#include <atomic>
 #include <iostream>
 using namespace std;
 
-extern bool running;
+extern atomic<bool> running;
+extern int serverSocket;
 struct ClientSession {
     bool authorized = false;
     string username;
