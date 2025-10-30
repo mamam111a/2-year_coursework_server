@@ -15,6 +15,6 @@ void Log(const string& message);
 void SignalCheck(int signal);
 bool SendMessage(int& clientSocket, const string &message);
 bool ReceiveMessage(int& clientSocket, string &outMessage);
-void DeleteTmp();
+void DeleteTmp(const string& username);
 string toLower(const string& input);
 #endif

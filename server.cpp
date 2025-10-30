@@ -158,7 +158,7 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                 break; 
             }
             if (command == "OK") {
-                DeleteTmp();
+                DeleteTmp(session.username);
                 continue;
             }
             Log("CLIENT " + clientIP + ":" + to_string(clientPort) + ":" + session.username + ":" + session.role + " отправил запрос ==>> " + command) ;

@@ -34,10 +34,10 @@ void SignalCheck(int signal) {
     }
 }
 
-void DeleteTmp() {
-    DeleteTmpInDirectory(".");         
-    DeleteTmpInDirectory("books"); 
-    DeleteTmpInDirectory("shops");
+void DeleteTmp(const string& username) {
+    DeleteTmpInDirectory(".", username);         
+    DeleteTmpInDirectory("books", username); 
+    DeleteTmpInDirectory("shops", username);
 }
 
 bool SendMessage(int& clientSocket, const string &message) {

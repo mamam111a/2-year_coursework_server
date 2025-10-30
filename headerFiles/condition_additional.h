@@ -7,7 +7,7 @@
 using namespace std;
 using json = nlohmann::json;
 
-void DeleteTmpInDirectory(const string& path);
+void DeleteTmpInDirectory(const string& path, const string& username);
 void RemoveConditionByIndex(Condition*& head, int& index);
 string GetCellByIndex(const string& row, int index);
 string CleanString(const string& str);

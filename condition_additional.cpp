@@ -14,21 +14,23 @@ recursive_mutex& GetDirMutex(const string& dirPath) {
     return dirMutexes[dirPath]; 
 }
 
-void DeleteTmpInDirectory(const string& path) {
+void DeleteTmpInDirectory(const string& path, const string& username) {
     lock_guard<recursive_mutex> lock(GetDirMutex(path));
     DIR* dir;
     struct dirent* entry;
     int deleted = 0;
-
     dir = opendir(path.c_str());
+    if (!dir) return; 
+    const string suffix = "_" + username + ".tmp";
     while ((entry = readdir(dir)) != nullptr) {
         string filename = entry->d_name;
-        if (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".tmp") {
+        if (filename.size() >= suffix.size() &&
+            filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0) {
             string fullPath = path + "/" + filename;
             if (remove(fullPath.c_str()) == 0) {
                 deleted++;
             }
-        }   
+        }
     }
     closedir(dir);
 }
