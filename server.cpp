@@ -220,8 +220,9 @@ int main() {
     }
 
     Log("SERVER: СЕРВЕР ЗАПУЩЕН!");
-
+    cout << endl << "SERVER: СЕРВЕР ЗАПУЩЕН!" << endl;
     signal(SIGINT, SignalCheck);
+    signal(SIGHUP, SignalCheck);
 
     while (running) {
         clientSocket = accept(serverSocket, (struct sockaddr*)&clientSettings, &clientSetLen);
@@ -241,6 +242,5 @@ int main() {
     }
 
     close(serverSocket);
-    Log("SERVER: Завершение работы.");
     return 0;
 }

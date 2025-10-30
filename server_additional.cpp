@@ -29,8 +29,9 @@ void Log(const string& message) {
     }
 }
 void SignalCheck(int signal) {
-    if (signal == SIGINT) {
+    if (signal == SIGINT || signal == SIGHUP) {
         running = false;
+        Log("SERVER: Получен сигнал завершения (" + to_string(signal) + ")");
     }
 }
 
