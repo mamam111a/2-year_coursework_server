@@ -199,7 +199,7 @@ int main() {
 
     serverSettings.sin_family = AF_INET;
     serverSettings.sin_port = htons(7432);
-    serverSettings.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serverSettings.sin_addr.s_addr = INADDR_ANY;
 
     int opt = 1;
     if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
@@ -221,7 +221,6 @@ int main() {
     }
 
     Log("SERVER: СЕРВЕР ЗАПУЩЕН!");
-    cout << endl << "SERVER: СЕРВЕР ЗАПУЩЕН!" << endl;
     signal(SIGINT, SignalCheck);
     signal(SIGHUP, SignalCheck);
 

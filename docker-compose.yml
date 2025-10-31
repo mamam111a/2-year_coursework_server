@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: ${UID}
+        GID: ${GID}
+        TZ: ${TZ}
+    image: coursework-server_image
+    container_name: coursework-server_container
+    ports:
+      - "${PORT}:${PORT}"
+    env_file:
+      - .env
+    volumes:
+      - ./config:/app/config
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'top -b -n1 | head -n5 && free -m && df -h && ls /proc/$$/fd | wc -l'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

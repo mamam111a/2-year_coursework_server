@@ -117,7 +117,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
         query.erase(query.size() - 4); 
         toClient.str("");
         toClient.clear();
-
+        cout << endl << query << endl;
         if (FindByCriteria(query, username)) {
             ifstream finalFile("finalFile_" + username + ".tmp");
             ostringstream oss;
@@ -142,6 +142,15 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
         }
         else if (elements[0] == "addbooks") {
             elements.erase(elements.begin());
+            int maxShop;
+            lock_guard<recursive_mutex> lock3(GetFileMutex("shops/shops_last_Line.txt"));
+            ifstream lastLineFile("shops/shops_last_Line.txt");
+            lastLineFile >> maxShop;
+            if(stoi(elements[0]) > maxShop) {
+                toClient << "!Не существует магазина под таким номером!";
+                return false;
+            }
+
             if(tableBooks.InsertLastRow(elements)) toClient << "!Строка успешно добавлена!";
             else toClient << "!Ошибка добавления строки!";
         }
@@ -181,7 +190,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             if(tableShops.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
             else toClient << "!Ошибка удаления!";
         }
-        //string& criteria, string& nameColumn, string newValue
+        
         else if (elements[0] == "updatebooks") {
             string query, nameColumn, newValue;
             elements.erase(elements.begin());
@@ -189,6 +198,15 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             elements.pop_back();
             nameColumn = elements.back();
             elements.pop_back();
+            int maxShop;
+            lock_guard<recursive_mutex> lock3(GetFileMutex("shops/shops_last_Line.txt"));
+            ifstream lastLineFile("shops/shops_last_Line.txt");
+            lastLineFile >> maxShop;
+            if(nameColumn == "shop_id") {
+                if(stoi(newValue) > maxShop)
+                toClient << "!Не существует магазина под таким номером!";
+                return false;
+            }
             for(int i = 0; i < elements.size(); i++) {
                 if(elements[i].empty()) continue;
                 string category;
@@ -227,33 +245,93 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             if(tableShops.Correction(query,nameColumn,newValue,username)) toClient << "!Успешное обновление!";
             else toClient << "!Ошибка обновления!";
         }
-        else if (elements[0] == "findbooks") { 
-            string query;
+        else if (elements[0] == "findbooks") {
             elements.erase(elements.begin());
-            for(int i = 0; i < elements.size(); i++) {
-                if(elements[i].empty()) continue;
-                string category;
-                if(i==0) category = "shop_id";
-                else if(i == 1) category = "section";
-                else if(i == 2) category = "author";
-                else if(i == 3) category = "title";
-                else if(i == 4) category = "publisher";
-                else if(i == 5) category = "publishing_year";
-                else if(i == 6) category = "quantity";
-                else if(i == 7) category = "price";
-                else if(i == 8) category = "additional_info";
-                query += "books." + category + " = '" + elements[i] + "' AND ";
+            vector<string> andElements;
+            vector<vector<string>> orElements;
+            for (int i = 0; i < elements.size(); i++) {
+                if (elements[i].empty()) continue;
+                if (elements[i].find(u8"или") != string::npos) {
+                    string tmp = elements[i];
+                    int pos = 0;
+                    while ((pos = tmp.find(u8"или", pos)) != string::npos) {
+                        tmp.replace(pos, string(u8"или").size(), "|");
+                        pos += 1;
+                    }
+                    stringstream ssTmp(tmp);
+                    string wordOr;
+                    vector<string> orConds;
+        
+                    while (getline(ssTmp, wordOr, '|')) {
+
+                        int start = wordOr.find_first_not_of(" \t");
+                        int end = wordOr.find_last_not_of(" \t");
+                        if (start != string::npos && end != string::npos)
+                            wordOr = wordOr.substr(start, end - start + 1);
+                        string category;
+                        if(i == 0) category = "shop_id";
+                        else if(i == 1) category = "section";
+                        else if(i == 2) category = "author";
+                        else if(i == 3) category = "title";
+                        else if(i == 4) category = "publisher";
+                        else if(i == 5) category = "publishing_year";
+                        else if(i == 6) category = "quantity";
+                        else if(i == 7) category = "price";
+                        else if(i == 8) category = "additional_info";
+        
+                        orConds.push_back("books." + category + " = '" + wordOr + "'");
+                    }
+                    orElements.push_back(orConds);
+                } else {
+                    string category;
+                    if(i == 0) category = "shop_id";
+                    else if(i == 1) category = "section";
+                    else if(i == 2) category = "author";
+                    else if(i == 3) category = "title";
+                    else if(i == 4) category = "publisher";
+                    else if(i == 5) category = "publishing_year";
+                    else if(i == 6) category = "quantity";
+                    else if(i == 7) category = "price";
+                    else if(i == 8) category = "additional_info";
+        
+                    andElements.push_back("books." + category + " = '" + elements[i] + "'");
+                }
             }
-            query.erase(query.size() - 5);
-            if (FindByCriteria(query,username)) {
+            vector<string> combined;
+            combined.push_back("");
+            for (auto& orBlock : orElements) {
+                vector<string> newCombined;
+                for (auto& prefix : combined) {
+                    for (auto& cond : orBlock) {
+                        string tmp = prefix;
+                        if (!tmp.empty()) tmp += " AND ";
+                        tmp += cond;
+                        newCombined.push_back(tmp);
+                    }
+                }
+                combined = newCombined;
+            }
+            for (auto& andEl : andElements) {
+                for (auto& s : combined) {
+                    if (!s.empty()) s = andEl + " AND " + s;
+                    else s = andEl;
+                }
+            }
+            string query;
+            for (auto& s : combined) query += s + " OR ";
+            if (!query.empty()) query.erase(query.size() - 4); 
+        
+            toClient.str("");
+            toClient.clear();
+            cout << endl << query << endl;
+            if (FindByCriteria(query, username)) {
                 ifstream finalFile("finalFile_" + username + ".tmp");
                 ostringstream oss;
-                oss << finalFile.rdbuf(); 
+                oss << finalFile.rdbuf();
                 finalFile.close();
                 string message = oss.str();
                 toClient << "#";
-                toClient << message;    
-    
+                toClient << message;
                 return true;
             } else {
                 toClient << "!Ничего не найдено :( ))";

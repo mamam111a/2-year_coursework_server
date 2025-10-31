@@ -13,6 +13,11 @@
 #include "headerFiles/server_additional.h"
 #include "headerFiles/condition_additional.h"
 #include "headerFiles/filelocks.h"
+
+#include <locale>          
+#include <codecvt>          
+#include <string>           
+#include <cwctype>
 using namespace std;
 const string logFileName = "server_log.txt";
 
@@ -29,6 +34,7 @@ void Log(const string& message) {
     if (logFile.is_open()) {
         logFile << "[" << buf << "] " << message << endl;
     }
+    cout << "[" << buf << "] " << message << endl;
 }
 void SignalCheck(int signal) {
     if (signal == SIGINT || signal == SIGHUP) {
