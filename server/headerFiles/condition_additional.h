@@ -15,6 +15,6 @@ int GetColumnIndex(json& schema, string& nameTable, string& nameColumn);
 Condition* FindConditionOper(Condition* head, const string& oper);
 Condition* ConstFindConditionOper(const Condition* head, const string& oper);
 int GetSizeCondition(Condition* head);
-bool isLineInFile(const string& filename, const string& lineToCheck);
+int getLastJForI(const string& dir, int targetI, const string& username);
 
 #endif

@@ -25,10 +25,18 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
     vector<string> elements;
     stringstream ss(command);
     string word;
-
     while (getline(ss, word, '|')) {
         elements.push_back(word);
     }
+    string priceOt = elements[8];
+    string priceDo= elements[9];
+    string quantityOt = elements[6];
+    string quantityDo = elements[7];
+    elements.pop_back();
+    elements.pop_back();
+    elements.pop_back();
+    elements.pop_back();
+
     ConceptTable tableBooks("books/books.json", username);
     ConceptTable tableShops("shops/shops.json", username);
     if(role == "user" ) {
@@ -120,23 +128,43 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
         cout << endl << query << endl;
         if (FindByCriteria(query, username)) {
             ifstream finalFile("finalFile_" + username + ".tmp");
-            ostringstream oss;
-            oss << finalFile.rdbuf(); 
+            ofstream finalFinalFile("finalFileAfterChecking_" + username + ".tmp");
+            string temp;
+            bool rowAdded = false;
+        
+            while(getline(finalFile, temp)) {
+                string quantity = GetCellByIndex(temp, 7);
+                string price = GetCellByIndex(temp, 8);
+                if((stoi(quantity) >= stoi(quantityOt) && stoi(quantity) <= stoi(quantityDo)) && 
+                ( stoi(price)  >= stoi(priceOt) && stoi(price) <= stoi(priceDo))) { 
+                    finalFinalFile << temp << endl; rowAdded = true; 
+                }
+            }
+        
+            finalFinalFile.close();
             finalFile.close();
-
+        
+            if(!rowAdded) {
+                toClient << "!Ничего не найдено :( ))";
+                return false;
+            }
+        
+            ifstream finalFinalFileForRead("finalFileAfterChecking_" + username + ".tmp");
+            ostringstream oss;
+            oss << finalFinalFileForRead.rdbuf(); 
+            finalFinalFileForRead.close();
+        
             string message = oss.str(); 
             toClient << "#";
             toClient << message;    
-
+        
             return true;
-        } else {
-            toClient << "!Ничего не найдено :( ))";
-            return false;
         }
     }
     else {
         if((elements[0] == "addshops")) {
             elements.erase(elements.begin());
+            
             if(tableShops.InsertLastRow(elements)) toClient << "!Строка успешно добавлена!";
             else toClient << "!Ошибка добавления строки!";
         }

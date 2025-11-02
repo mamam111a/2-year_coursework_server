@@ -5,12 +5,12 @@
 #include "headerFiles/condition_additional.h"
 #include "headerFiles/workingCSV.h"
 #include "headerFiles/condition.h"
-#include <stack>
-#include <set>
+#include <filesystem>
 #include <mutex>
 #include "headerFiles/filelocks.h"
 #include <unordered_set>
 using json = nlohmann::json;
+
 using namespace std;
 
 Condition* SplitExpressionForStruct(string& filter) {
@@ -63,6 +63,7 @@ Condition* SplitExpressionForStruct(string& filter) {
 
         begin = end + 1;
     }
+    lastElement->countCond = conditionCount;
     return firstElement;
 }
 
@@ -160,150 +161,175 @@ Condition* ReplacingConditionsWithBool(Condition* expressions, string &username)
     return head;
 }
 
-bool FilteringForOneFile(Condition* condition, string& username) {
 
-    string result;
+bool FilteringForOneFile(Condition* condition, string& username) { 
     Condition* tempHead = condition;
+    Condition* currentCondition = tempHead;
+    Condition* prevCondition;
+    string nameTable;
+
     bool fullness = false;
+    bool openNewBlockAnd = false;
+    int countBlocksAnd = 1;
     bool isFoundOR = ConstFindConditionOper(condition, "OR");
-    while(condition != nullptr) {
-        if(condition->oper == "AND" && condition->trueOrFalse == false) { 
-            if(isFoundOR == false) return false;
-            RemoveConditionByIndex(tempHead, condition->index);
-            int tempCond = condition->index + 1;
-            RemoveConditionByIndex(tempHead, tempCond);
-        }
-        else if(condition->oper == "AND" && condition->trueOrFalse == true) {
-            if(condition->next->trueOrFalse == false) {
-                if(isFoundOR == false) return false;
-                RemoveConditionByIndex(tempHead, condition->index);
-                int tempCond = condition->index + 1;
-                RemoveConditionByIndex(tempHead, tempCond);
-            }
-        }
-        condition = condition->next;
-    }
-    Condition* newTempHead = tempHead;
-    int countConditions = GetSizeCondition(tempHead);
-
-    while(tempHead != nullptr) {
-        
-        if(tempHead->oper == "AND" || ConstFindConditionOper(tempHead, "AND") != nullptr) {
-
-            Condition* head = tempHead;
-            tempHead = FindConditionOper(tempHead, "AND");
-            string condition = tempHead->condition;
-            string nameTable;
-            if(condition.substr(0,5) == "books") nameTable = "books";
+    bool isFoundAND = ConstFindConditionOper(condition, "AND");
+    bool withoutBlocks = false;
+    vector<int> blocksToSkip;
+    while(true) {
+        if((isFoundAND == false && isFoundOR == false) || (isFoundAND == false && isFoundOR == true) ) {
+            
+            int indexCondition = currentCondition->index;
+            if(currentCondition->condition.substr(0,5) == "books") nameTable = "books";
             else nameTable = "shops";
-
-            int count;
-            int indexConditionA = tempHead->index;
-            int indexConditionB = tempHead->next->index;
-            int targetColumnB;
-            int targetColumnB1, targetColumnB2;
-            if(tempHead->targetColumns.size() == 1) {
-                targetColumnB = tempHead->next->targetColumns[0];
-                count = 1;
-
-            }
-            else {
-                targetColumnB1 = tempHead->next->targetColumns[0];
-                targetColumnB2 = tempHead->next->targetColumns[1];
-                count = 2;
-
-            }
-           
             ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
-            ifstream conditionFileA(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionA) + "_" + username +".tmp");
-            ifstream conditionFileB(nameTable + "/"+ "CheckCondition_" + to_string(indexConditionB) + "_" + username +".tmp");
-            if(count == 1) {
-                string tempA;
-                while(getline(conditionFileA,tempA)) {
-                    string tempB;
-                    conditionFileB.clear();              
-                    conditionFileB.seekg(0, ios::beg);
-                    getline(conditionFileB,tempB);
-                    string cellA =GetCellByIndex(tempA, targetColumnB);
-                    string cellB =GetCellByIndex(tempB, targetColumnB);
-                    if(cellA == cellB) {
-                        if(!isLineInFile("finalFile_" + username + ".tmp", tempA)) {   
-                            finalFile << tempA << endl;
-                            fullness = true;
-                            finalFile.flush(); 
-                        }
-                        
-                    }
-                }
-            }
-            else {
-                string tempA;
-                while(getline(conditionFileA,tempA)) { 
-                    string tempB;
-                    getline(conditionFileB,tempB);
-                    stringstream ss(tempA);
-                    string cell;
-                    int countColumns = 1;
-                    int countPairs = 0;
-                    while(getline(ss,cell, ';')) {
-                        if(countPairs == 2) {
-                            if(!isLineInFile("finalFile_" + username + ".tmp", tempA)) {
-                                finalFile << tempA << endl;
-                                fullness = true;
-                                finalFile.flush(); 
-                                break;
-                            }
-                             
-                        }
-                        countColumns++;
-                        if(countColumns == targetColumnB1 || countColumns == targetColumnB2) {
-                            countPairs++;
-                        }
-                    }
-                }
+            ifstream conditionFile(nameTable + "/"+ "CheckCondition_" + to_string(indexCondition) + "_" + username +".tmp");
+            string line;
+            while(getline(conditionFile,line)) {
+                finalFile << line << endl;
+                finalFile.flush();
+                fullness = true;
             }
             finalFile.close();
-            conditionFileA.close();
-            conditionFileB.close();
-            tempHead = head;
-            RemoveConditionByIndex(tempHead,indexConditionA);
-            RemoveConditionByIndex(tempHead,indexConditionB);
-            countConditions = countConditions - 2;
-            
+            conditionFile.close();
         }
-        else {
-            string condition = tempHead->condition; 
-            string nameTable;
-            if(condition.substr(0,5) == "books") nameTable = "books";
-            else nameTable = "shops";
-            int indexCondition = tempHead->index;
 
-          
-            ifstream conditionFileA(nameTable + "/" + "CheckCondition_" + to_string(indexCondition) + "_" + username +".tmp");
-            if(tempHead->trueOrFalse == 1) {
-                string temp;
-                while(getline(conditionFileA,temp)) {
-                    if(isLineInFile("finalFile_" + username + ".tmp", temp) == false) {
-                        ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
-                        finalFile << temp << endl;
-                        fullness = true;
-                        finalFile.close();
-                    }
+        else if(isFoundAND == true && isFoundOR == false) {
+            withoutBlocks = true;
+            if(currentCondition->index == 1) {
+                currentCondition = currentCondition->next;
+                continue;
+            }
+            if(currentCondition->condition.substr(0,5) == "books") nameTable = "books";
+            else nameTable = "shops";
+
+            int targetColumn = currentCondition->targetColumns[0];
+            int indexCondition = currentCondition->index;
+            ifstream conditionFileA;
+            ofstream BlockAND;
+
+            if (indexCondition == 2) conditionFileA.open(nameTable + "/"+ "CheckCondition_" + to_string(indexCondition - 1) + "_" + username + ".tmp");
+            else conditionFileA.open(nameTable + "/" + "BlockAND_" + to_string(indexCondition - 2) + "_" + username + ".tmp");
+            
+            string targetCell;
+            ifstream conditionFileB(nameTable + "/"+ "CheckCondition_" + to_string(indexCondition) + "_" + username +".tmp");
+            string rowSecondFile;
+            getline(conditionFileB, rowSecondFile);
+
+            targetCell = GetCellByIndex(rowSecondFile, targetColumn);
+            conditionFileB.close();
+            string rowFirstFile;
+
+            ofstream BlockANDnew(nameTable + "/" + "BlockAND_" + to_string(indexCondition - 1) + "_" + username +".tmp", ios::app);
+            while(getline(conditionFileA, rowFirstFile)) {
+                string currentTarget = GetCellByIndex(rowFirstFile,targetColumn);
+                if(currentTarget == targetCell) {
+                    BlockANDnew << rowFirstFile << endl;
+                    BlockANDnew.flush();
+                    fullness = true;
                 }
             }
+            BlockANDnew.close();
             conditionFileA.close();
-
-            RemoveConditionByIndex(tempHead,indexCondition);
-            countConditions = countConditions - 1;
-
         }
-        if(countConditions == 0) return fullness;
-        if(countConditions == 2) continue;
-        if(countConditions != 1) tempHead = tempHead->next;
-        
+
+        else if(isFoundAND == true && isFoundOR == true) {
+            
+            if(currentCondition->index == 1) {
+                prevCondition = currentCondition;
+                if(currentCondition->index == currentCondition->countCond) break;
+                currentCondition = currentCondition->next;
+                continue;
+            }
+            else if(prevCondition->oper== "OR") {
+                openNewBlockAnd = true;
+                prevCondition = currentCondition;
+                if(currentCondition->index == currentCondition->countCond) break;
+                currentCondition = currentCondition->next;
+                continue;
+            }
+            
+            if(currentCondition->condition.substr(0,5) == "books") nameTable = "books";
+            else nameTable = "shops";
+
+            int targetColumn = currentCondition->targetColumns[0];
+            int indexCondition = currentCondition->index;
+            ifstream conditionFileA;
+            if (indexCondition == 2 || openNewBlockAnd == true) {
+
+                if(openNewBlockAnd) countBlocksAnd++;
+                openNewBlockAnd = false;
+                conditionFileA.open(nameTable + "/"+ "CheckCondition_" + to_string(indexCondition - 1) + "_" + username + ".tmp");
+                
+            }
+            
+            else {
+                conditionFileA.open(nameTable + "/" + "BlockAND_" + to_string(indexCondition - 1) + "_" + to_string(countBlocksAnd) + "_" + username + ".tmp");
+            }
+            
+            string targetCell;
+            ifstream conditionFileB(nameTable + "/"+ "CheckCondition_" + to_string(indexCondition) + "_" + username +".tmp");
+            string rowSecondFile;
+            getline(conditionFileB, rowSecondFile);
+
+            targetCell = GetCellByIndex(rowSecondFile, targetColumn);
+            conditionFileB.close();
+            string rowFirstFile;
+
+            ofstream BlockAND(nameTable + "/" + "BlockAND_" + to_string(indexCondition) + "_" + to_string(countBlocksAnd) + "_" + username +".tmp", ios::app);
+            bool rowAdded = false;
+            while(getline(conditionFileA, rowFirstFile)) {
+                string currentTarget = GetCellByIndex(rowFirstFile,targetColumn);
+                
+                if(currentTarget == targetCell) {
+                    BlockAND << rowFirstFile << endl;
+                    BlockAND.flush();
+                    fullness = true;
+                    rowAdded = true;
+                }
+            }
+            if(rowAdded == false) blocksToSkip.push_back(countBlocksAnd);
+            BlockAND.close();
+            conditionFileA.close();
+            prevCondition = currentCondition;
+        }
+
+        if(currentCondition->index == currentCondition->countCond) {
+            if(isFoundAND == true) {
+                ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
+                for(int i = 1; i <= countBlocksAnd; i++ ) {
+                    if(find(blocksToSkip.begin(), blocksToSkip.end(), i) != blocksToSkip.end()) {
+                        continue;
+                    }
+                    ifstream BlockANDnew;
+                    if(withoutBlocks == false) {
+                        int targetFirstNumber = getLastJForI("books", i, username);
+                        BlockANDnew.open(nameTable + "/" + "BlockAND_" + to_string(targetFirstNumber) + "_" + to_string(i) + "_" + username +".tmp");
+                    }
+                    else {
+                        BlockANDnew.open(nameTable + "/" + "BlockAND_" + to_string(currentCondition->index - 1) + "_" + username + ".tmp");
+                    }
+                    
+                    if (!BlockANDnew.is_open()) continue;
+                    string row;
+                    while(getline(BlockANDnew, row)) {
+                        finalFile << row << endl;
+                        finalFile.flush();
+                        fullness = true;
+                    }
+                    BlockANDnew.close();
+                    
+                }
+                finalFile.close();
+            }
+            
+            return fullness;
+        }
+        else currentCondition = currentCondition->next;
+
+    
     }
-    return fullness; 
 }
+
 bool FindByCriteria(string& expression, string &username) { 
     bool fullness;
     Condition* condition = SplitExpressionForStruct(expression);

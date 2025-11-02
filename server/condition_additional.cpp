@@ -6,9 +6,10 @@
 #include "headerFiles/crud.h"
 #include "headerFiles/condition_additional.h"
 #include "headerFiles/filelocks.h"
+#include <regex>
 using namespace std;
 using json = nlohmann::json;
-
+namespace fs = filesystem;
 recursive_mutex& GetDirMutex(const string& dirPath) {
     static map<string, recursive_mutex> dirMutexes;
     return dirMutexes[dirPath]; 
@@ -119,15 +120,19 @@ int GetSizeCondition(Condition* head) {
     }
     return size;
 }
-bool isLineInFile(const string& filename, const string& lineToCheck) {
-    ifstream file(filename); 
-    string currentLine;
-    while (getline(file, currentLine)) {
-        if (currentLine == lineToCheck) {
-            file.close(); 
-            return true;
+
+int getLastJForI(const string& dir, int targetI, const string& username) {
+    int maxJ = 0;
+    regex pattern("BlockAND_(\\d+)_" + to_string(targetI) + "_" + username + "\\.tmp");
+
+    for (const auto& entry : fs::directory_iterator(dir)) {
+        smatch match;
+        string filename = entry.path().filename().string();
+        if (regex_match(filename, match, pattern)) {
+            int j = stoi(match[1].str());
+            if (j > maxJ) maxJ = j;
         }
     }
-    file.close(); 
-    return false; 
+
+    return maxJ; 
 }
