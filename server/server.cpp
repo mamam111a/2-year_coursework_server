@@ -10,7 +10,6 @@
 #include <csignal>
 #include <thread>
 #include <mutex>
-#include <format>
 #include <atomic>
 #include "headerFiles/authorization.h"
 #include "headerFiles/DBMSbody.h"
@@ -27,8 +26,6 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
     int receivedBytes;
     ClientSession session;
     ostringstream toClient;
-
-    signal(SIGPIPE, SIG_IGN);
 
     while (true) { 
         while (!session.authorized) {
@@ -223,6 +220,7 @@ int main() {
     Log("SERVER: СЕРВЕР ЗАПУЩЕН!");
     signal(SIGINT, SignalCheck);
     signal(SIGHUP, SignalCheck);
+    signal(SIGTERM, SignalCheck);
 
     while (running) {
         clientSocket = accept(serverSocket, (struct sockaddr*)&clientSettings, &clientSetLen);

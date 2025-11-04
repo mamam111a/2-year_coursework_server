@@ -16,5 +16,6 @@ Condition* FindConditionOper(Condition* head, const string& oper);
 Condition* ConstFindConditionOper(const Condition* head, const string& oper);
 int GetSizeCondition(Condition* head);
 int getLastJForI(const string& dir, int targetI, const string& username);
+void SetCountCondForAll(Condition* head, int count);
 
 #endif

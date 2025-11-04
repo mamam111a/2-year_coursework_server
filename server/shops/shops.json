@@ -1,6 +1,6 @@
 {
     "name": "shops",
-    "tuples_limit": 10,
+    "tuples_limit": 50,
     "structure": {
         "shops": [
             "shop_id",

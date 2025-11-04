@@ -28,21 +28,24 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
     while (getline(ss, word, '|')) {
         elements.push_back(word);
     }
-    string priceOt = elements[8];
-    string priceDo= elements[9];
-    string quantityOt = elements[6];
-    string quantityDo = elements[7];
-    elements.pop_back();
-    elements.pop_back();
-    elements.pop_back();
-    elements.pop_back();
-
+    string priceOt, priceDo, quantityOt, quantityDo ;
+    if(role == "user") {
+        priceOt = elements[8];
+        priceDo= elements[9];
+        quantityOt = elements[6];
+        quantityDo = elements[7];
+        elements.pop_back();
+        elements.pop_back();
+        elements.pop_back();
+        elements.pop_back();
+    }
     ConceptTable tableBooks("books/books.json", username);
     ConceptTable tableShops("shops/shops.json", username);
     if(role == "user" ) {
         int intListShops = elements.size() - 1;
         string strListShops = elements[intListShops];
         elements.pop_back();
+
 
         vector<string> andElements;        
         vector<vector<string>> orElements;  
@@ -160,13 +163,17 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
         
             return true;
         }
+        else{
+            toClient << "!Ничего не найдено :( ))";
+            return false;
+        }
     }
     else {
         if((elements[0] == "addshops")) {
             elements.erase(elements.begin());
             
             if(tableShops.InsertLastRow(elements)) toClient << "!Строка успешно добавлена!";
-            else toClient << "!Ошибка добавления строки!";
+            else toClient << "!Ошибка! Строка не была добавлена!";
         }
         else if (elements[0] == "addbooks") {
             elements.erase(elements.begin());
@@ -180,7 +187,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             }
 
             if(tableBooks.InsertLastRow(elements)) toClient << "!Строка успешно добавлена!";
-            else toClient << "!Ошибка добавления строки!";
+            else toClient << "!Ошибка! Строка не была добавлена!";
         }
         else if (elements[0] == "deletebooks") { 
             string query;
@@ -201,7 +208,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             }
             query.erase(query.size() - 5);
             if(tableBooks.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
-            else toClient << "!Ошибка удаления!";
+            else toClient << "!Ошибка! Строка не была удалена!";
         }
         else if (elements[0] == "deleteshops") { 
             string query;
@@ -216,7 +223,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             }
             query.erase(query.size() - 5);
             if(tableShops.DeleteRowByCriteria(query,username)) toClient << "!Успешное удаление!";
-            else toClient << "!Ошибка удаления!";
+            else toClient << "!Ошибка! Строка не была удалена!";
         }
         
         else if (elements[0] == "updatebooks") {
@@ -231,9 +238,10 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             ifstream lastLineFile("shops/shops_last_Line.txt");
             lastLineFile >> maxShop;
             if(nameColumn == "shop_id") {
-                if(stoi(newValue) > maxShop)
-                toClient << "!Не существует магазина под таким номером!";
-                return false;
+                if(stoi(newValue) > maxShop) {
+                    toClient << "!Не существует магазина под таким номером!";
+                    return false;
+                }
             }
             for(int i = 0; i < elements.size(); i++) {
                 if(elements[i].empty()) continue;
@@ -251,7 +259,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             }
             query.erase(query.size() - 5);
             if(tableBooks.Correction(query,nameColumn,newValue, username)) toClient << "!Успешное обновление!";
-            else toClient << "!Ошибка обновления!";
+            else toClient << "!Ошибка! Строка не была обновлена!";
         }
         else if (elements[0] == "updateshops") {
             string query, nameColumn, newValue;
@@ -271,7 +279,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             }
             query.erase(query.size() - 5);
             if(tableShops.Correction(query,nameColumn,newValue,username)) toClient << "!Успешное обновление!";
-            else toClient << "!Ошибка обновления!";
+            else toClient << "!Ошибка! Строка не была обновлена!";
         }
         else if (elements[0] == "findbooks") {
             elements.erase(elements.begin());

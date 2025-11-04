@@ -136,3 +136,11 @@ int getLastJForI(const string& dir, int targetI, const string& username) {
 
     return maxJ; 
 }
+
+void SetCountCondForAll(Condition* head, int count) {
+    Condition* temp = head;
+    while (temp) {
+        temp->maxCount = count;
+        temp = temp->next;
+    }
+}

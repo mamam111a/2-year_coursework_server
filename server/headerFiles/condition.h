@@ -8,7 +8,7 @@ using namespace std;
 struct Condition {
     vector<int> targetColumns;
     int index;
-    int countCond;
+    int maxCount;
 
     bool trueOrFalse;
     string condition;

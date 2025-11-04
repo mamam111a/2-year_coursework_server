@@ -13,6 +13,7 @@ using json = nlohmann::json;
 
 using namespace std;
 
+
 Condition* SplitExpressionForStruct(string& filter) {
     
     Condition* firstElement = nullptr;
@@ -63,11 +64,11 @@ Condition* SplitExpressionForStruct(string& filter) {
 
         begin = end + 1;
     }
-    lastElement->countCond = conditionCount;
+    SetCountCondForAll(firstElement, conditionCount);
     return firstElement;
 }
 
-bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, bool& hasCartezian, string& username) {
+bool CheckCondition(vector<string>& parameters, const string &tmpFileName, const int& tmpFileCount, string& username) {
 
     bool isFound = false;
     if(parameters.size() == 3) {
@@ -146,12 +147,14 @@ Condition* ReplacingConditionsWithBool(Condition* expressions, string &username)
             vector<string> parameters = {nameTable, nameColumn, target};
             json jsonData = ReadSchema(nameTable + "/" + nameTable + ".json");
             int indexTargetColumn = GetColumnIndex(jsonData,nameTable,nameColumn);
-            bool isCartezian = false;
-            if(CheckCondition(parameters, "CheckCondition", i, isCartezian, username)) {
+            if(CheckCondition(parameters, "CheckCondition", i, username)) {
                 expressions->trueOrFalse = true;
                 expressions->targetColumns.push_back(indexTargetColumn);
             }
-            else expressions->trueOrFalse = false;
+            else {
+                expressions->trueOrFalse = false;
+                expressions->targetColumns.push_back(indexTargetColumn);
+            }
 
         }
 
@@ -177,7 +180,14 @@ bool FilteringForOneFile(Condition* condition, string& username) {
     vector<int> blocksToSkip;
     while(true) {
         if((isFoundAND == false && isFoundOR == false) || (isFoundAND == false && isFoundOR == true) ) {
+
+            if(currentCondition->trueOrFalse == false) {
+                if(currentCondition->index == currentCondition->maxCount) break;
+                currentCondition = currentCondition->next;
+                continue;
+            }
             
+
             int indexCondition = currentCondition->index;
             if(currentCondition->condition.substr(0,5) == "books") nameTable = "books";
             else nameTable = "shops";
@@ -194,6 +204,9 @@ bool FilteringForOneFile(Condition* condition, string& username) {
         }
 
         else if(isFoundAND == true && isFoundOR == false) {
+
+            if(currentCondition->trueOrFalse == false) return false;
+
             withoutBlocks = true;
             if(currentCondition->index == 1) {
                 currentCondition = currentCondition->next;
@@ -232,18 +245,29 @@ bool FilteringForOneFile(Condition* condition, string& username) {
             conditionFileA.close();
         }
 
+
+
+        //////////////////////////////////
         else if(isFoundAND == true && isFoundOR == true) {
             
+            if (currentCondition->trueOrFalse == false || currentCondition->targetColumns[0] == -1) {
+                while(currentCondition->index != currentCondition->maxCount && currentCondition->oper != "OR") {
+                    prevCondition = currentCondition;
+                    currentCondition = currentCondition->next;  
+                }
+                if (currentCondition->index == currentCondition->maxCount) break;
+            }
+
             if(currentCondition->index == 1) {
                 prevCondition = currentCondition;
-                if(currentCondition->index == currentCondition->countCond) break;
+                if(currentCondition->index == currentCondition->maxCount) break;
                 currentCondition = currentCondition->next;
                 continue;
             }
             else if(prevCondition->oper== "OR") {
                 openNewBlockAnd = true;
                 prevCondition = currentCondition;
-                if(currentCondition->index == currentCondition->countCond) break;
+                if(currentCondition->index == currentCondition->maxCount) break;
                 currentCondition = currentCondition->next;
                 continue;
             }
@@ -251,7 +275,9 @@ bool FilteringForOneFile(Condition* condition, string& username) {
             if(currentCondition->condition.substr(0,5) == "books") nameTable = "books";
             else nameTable = "shops";
 
+
             int targetColumn = currentCondition->targetColumns[0];
+
             int indexCondition = currentCondition->index;
             ifstream conditionFileA;
             if (indexCondition == 2 || openNewBlockAnd == true) {
@@ -293,40 +319,44 @@ bool FilteringForOneFile(Condition* condition, string& username) {
             prevCondition = currentCondition;
         }
 
-        if(currentCondition->index == currentCondition->countCond) {
-            if(isFoundAND == true) {
-                ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
-                for(int i = 1; i <= countBlocksAnd; i++ ) {
-                    if(find(blocksToSkip.begin(), blocksToSkip.end(), i) != blocksToSkip.end()) {
-                        continue;
-                    }
-                    ifstream BlockANDnew;
-                    if(withoutBlocks == false) {
-                        int targetFirstNumber = getLastJForI("books", i, username);
-                        BlockANDnew.open(nameTable + "/" + "BlockAND_" + to_string(targetFirstNumber) + "_" + to_string(i) + "_" + username +".tmp");
-                    }
-                    else {
-                        BlockANDnew.open(nameTable + "/" + "BlockAND_" + to_string(currentCondition->index - 1) + "_" + username + ".tmp");
-                    }
-                    
-                    if (!BlockANDnew.is_open()) continue;
-                    string row;
-                    while(getline(BlockANDnew, row)) {
-                        finalFile << row << endl;
-                        finalFile.flush();
-                        fullness = true;
-                    }
-                    BlockANDnew.close();
-                    
-                }
-                finalFile.close();
-            }
-            
-            return fullness;
+        if(currentCondition->index == currentCondition->maxCount) break;
+        else {
+            currentCondition = currentCondition->next;
         }
-        else currentCondition = currentCondition->next;
 
-    
+    }
+
+
+    if(currentCondition->index == currentCondition->maxCount) {
+        if(isFoundAND == true) {
+            ofstream finalFile("finalFile_" + username + ".tmp", ios::app);
+            for(int i = 1; i <= countBlocksAnd; i++ ) {
+                if(find(blocksToSkip.begin(), blocksToSkip.end(), i) != blocksToSkip.end()) {
+                    continue;
+                }
+                ifstream BlockANDnew;
+                if(withoutBlocks == false) {
+                    int targetFirstNumber = getLastJForI("books", i, username);
+                    BlockANDnew.open(nameTable + "/" + "BlockAND_" + to_string(targetFirstNumber) + "_" + to_string(i) + "_" + username +".tmp");
+                }
+                else {
+                    BlockANDnew.open(nameTable + "/" + "BlockAND_" + to_string(currentCondition->index - 1) + "_" + username + ".tmp");
+                }
+                
+                if (!BlockANDnew.is_open()) continue;
+                string row;
+                while(getline(BlockANDnew, row)) {
+                    finalFile << row << endl;
+                    finalFile.flush();
+                    fullness = true;
+                }
+                BlockANDnew.close();
+                
+            }
+            finalFile.close();
+        }
+        
+        return fullness;
     }
 }
 

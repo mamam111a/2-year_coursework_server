@@ -37,6 +37,14 @@ int ConceptTable::GetRowID(const string& str) {
     return stoi(temp);    
 }
 bool ConceptTable::InsertLastRow(vector<string>& newLine) {
+    if (lastCSV == 0) {
+        lastCSV = 1;  
+        lock_guard<recursive_mutex> lock1(GetFileMutex(name + "/" + name + "_list_CSV.txt"));
+        ofstream listCSV(name + "/" + name + "_list_CSV.txt");
+        if (!listCSV.is_open()) return false;
+        listCSV << to_string(lastCSV);
+        listCSV.close();
+    }
     string currFilepath = name + "/" + name + "_" + to_string(lastCSV) + ".csv";
     lock_guard<recursive_mutex> lock(GetFileMutex(currFilepath));
     if (LastLine % tupleLimit == 0 && LastLine != 0) {

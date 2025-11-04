@@ -37,9 +37,10 @@ void Log(const string& message) {
     cout << "[" << buf << "] " << message << endl;
 }
 void SignalCheck(int signal) {
-    if (signal == SIGINT || signal == SIGHUP) {
+    if (signal == SIGINT || signal == SIGHUP || signal == SIGTERM) {
         running = false;
         if (serverSocket != -1) {
+            shutdown(serverSocket, SHUT_RDWR); 
             close(serverSocket);
             serverSocket = -1;
             Log("SERVER: Получен сигнал завершения (" + to_string(signal) + "), сокет закрыт");
