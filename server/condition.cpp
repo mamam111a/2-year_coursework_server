@@ -245,9 +245,6 @@ bool FilteringForOneFile(Condition* condition, string& username) {
             conditionFileA.close();
         }
 
-
-
-        //////////////////////////////////
         else if(isFoundAND == true && isFoundOR == true) {
             
             if (currentCondition->trueOrFalse == false || currentCondition->targetColumns[0] == -1) {

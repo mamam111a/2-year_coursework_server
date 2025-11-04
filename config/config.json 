@@ -1,6 +1,6 @@
 {
     "port": 7432,
     "db_path": "data/database.db",
-    "max_clients": 10
+    "max_clients": 5
   }
   

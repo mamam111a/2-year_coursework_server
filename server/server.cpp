@@ -198,6 +198,7 @@ int main() {
     serverSettings.sin_port = htons(7432);
     serverSettings.sin_addr.s_addr = INADDR_ANY;
 
+    
     int opt = 1;
     if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         Log("SERVER: Ошибка установки SO_REUSEADDR");

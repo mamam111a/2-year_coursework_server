@@ -9,11 +9,8 @@
 
 Перейдите в главную директорию, где находится файл README.md.
 Откройте терминал в этой директории.
-Загрузите Docker-образ, выполнив команду:
-"docker load -i ./images/ubuntu-24.04.tar"
-
-Запустите сервер:
-"docker compose up --build"
+Загрузите Docker-образ и запустите сервер, выполнив команду:
+"docker load -i ./images/ubuntu-24.04.tar && docker compose up --build"
 
 2) Просмотр логов сервера
 "docker logs coursework-server_container"
