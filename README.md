@@ -15,17 +15,3 @@
 1.3 Просмотр логов сервера
 "docker logs coursework-server_container"
 
-
-2. Инструкция по запуску сервера на Windows:
-   
-2.1 Установка Docker (если ещё не установлен)
-Перейдите на сайт "https://www.docker.com/products/docker-desktop/" и скачайте Docker Desktop.
-
-2.2 Подготовка и запуск сервера
-Откройте консоль и перейдите в главную директорию проекта, где находится текущий файл README.md.
-Загрузите Docker-образ и запустите сервер, выполнив команду:
-"docker load -i ./images/ubuntu-24.04.tar && docker compose up --build -d"
-
-2.3 Просмотр логов сервера
-"docker logs coursework-server_container"
-
