@@ -55,7 +55,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
     
                 return true;
             } else {
-                toClient << "!Ничего не найдено :( ))";
+                toClient << "!Ничего не найдено :(";
                 return false;
             }
         }
@@ -177,7 +177,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 finalFile.close();
             
                 if(!rowAdded) {
-                    toClient << "!Ничего не найдено :( ))";
+                    toClient << "!Ничего не найдено :(";
                     return false;
                 }
             
@@ -193,7 +193,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 return true;
             }
             else{
-                toClient << "!Ничего не найдено :( ))";
+                toClient << "!Ничего не найдено :(";
                 return false;
             }
         }
@@ -400,7 +400,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 toClient << message;
                 return true;
             } else {
-                toClient << "!Ничего не найдено :( ))";
+                toClient << "!Ничего не найдено :(";
                 return false;
             }
         }
@@ -427,7 +427,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
     
                 return true;
             } else {
-                toClient << "!Ничего не найдено :( ))";
+                toClient << "!Ничего не найдено :(";
                 return false;
             }
             
