@@ -21,6 +21,7 @@
 
 using namespace std;
 
+
 void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
     char buffer[1024];
     int receivedBytes;
@@ -46,9 +47,17 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                 login = str.substr(pos0 + 1, pos1 - pos0 - 1);
                 password = str.substr(pos1 + 1);
 
+                string key = clientIP + "_" + login;
+
+                string blockMsg;
+                if (IsBlocked(key, blockMsg)) {
+                    SendMessage(clientSocket, blockMsg);
+                    continue;
+                }
                 string role;
                 if (CheckAuthorization(login, password, role)) {
                     session.authorized = true;
+                    ResetAttempts(key);
                     session.username = login;
                     session.role = role;
 
@@ -81,6 +90,7 @@ void ConnectionProcessing(int clientSocket, string clientIP, int clientPort) {
                     }
                     Log( "CLIENT " + clientIP + ":" + to_string(clientPort) + " авторизовался | login: " + login + " | role: " + role);
                 } else {
+                    RegisterFailedAttempt(key);
                     toClient.str("");
                     toClient.clear();
                     toClient << "!Некорректные данные! Попробуйте снова.";

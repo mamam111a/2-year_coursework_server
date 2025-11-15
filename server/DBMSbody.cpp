@@ -19,7 +19,47 @@
 using json = nlohmann::json;
 using namespace std;
 
-
+void ChangeStoreNumber(string& username) {
+    ifstream shopsJsonFile("shops/shops.json");
+    json shopsJson;
+    shopsJsonFile >> shopsJson;
+    int tuplesLimit = shopsJson["tuples_limit"];
+    ifstream finalFile("finalFile_" + username + ".tmp");
+    ofstream finalFileTemp("finalFile_with_shops_" + username + ".tmp");
+    string line;
+    while (getline(finalFile, line)) {
+        string numberShop = GetCellByIndex(line,1);
+        int numberShopFile = ((stoi(numberShop)) / tuplesLimit) + 1;
+        lock_guard<recursive_mutex> lock (GetFileMutex("shops/shops_" + to_string(numberShopFile) + ".csv"));
+        ifstream shopFile("shops/shops_" + to_string(numberShopFile) + ".csv");
+        string shopLine;
+        while(getline(shopFile, shopLine)) {
+            string id;
+            stringstream ss(shopLine);
+            getline(ss, id, ';');
+            if(id == numberShop) {
+                int pos = shopLine.find(';');
+                shopLine = shopLine.substr(pos + 1);
+                stringstream sss(shopLine);
+                string city, street, house, time, name;
+                getline(sss, name, ';'); 
+                getline(sss, city, ';');   
+                getline(sss, street, ';');
+                getline(sss, house, ';');
+                getline(sss, time, ';');
+                int pos1 = line.find(';');
+                line = line.substr(pos1 + 1);
+                int pos2 = line.find(';');
+                line = line.substr(pos2 + 1);
+                string address = city + "," + street + "," + house;
+                finalFileTemp << name << ";" << address << ";" << time << ";" << line << endl;
+            }
+        }
+        shopFile.close();
+    }
+    finalFile.close();
+    finalFileTemp.close();
+}
 bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, string& role, string& username) {
     command = toLower(command);
     vector<string> elements;
@@ -39,8 +79,10 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 if(elements[i].empty()) continue;
                 string category;
                 if(i==0) category = "name";
-                else if(i == 1) category = "address";
-                else if(i == 2) category = "working_hours";
+                else if(i == 1) category = "city";
+                else if(i == 2) category = "street";
+                else if(i == 3) category = "house_number";
+                else if(i == 4) category = "working_hours";
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
@@ -60,7 +102,7 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             }
         }
         else{
-            string priceOt, priceDo, quantityOt, quantityDo ;
+            string priceOt, priceDo, quantityOt, quantityDo;
 
             priceOt = elements[8];
             priceDo= elements[9];
@@ -159,14 +201,15 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             toClient.clear();
             cout << endl << query << endl;
             if (FindByCriteria(query, username)) {
-                ifstream finalFile("finalFile_" + username + ".tmp");
+                ChangeStoreNumber(username);
+                ifstream finalFile("finalFile_with_shops_" + username + ".tmp");
                 ofstream finalFinalFile("finalFileAfterChecking_" + username + ".tmp");
                 string temp;
                 bool rowAdded = false;
             
                 while(getline(finalFile, temp)) {
-                    string quantity = GetCellByIndex(temp, 7);
-                    string price = GetCellByIndex(temp, 8);
+                    string quantity = GetCellByIndex(temp, 8);
+                    string price = GetCellByIndex(temp, 9);
                     if((stoi(quantity) >= stoi(quantityOt) && stoi(quantity) <= stoi(quantityDo)) && 
                     ( stoi(price)  >= stoi(priceOt) && stoi(price) <= stoi(priceDo))) { 
                         finalFinalFile << temp << endl; rowAdded = true; 
@@ -247,8 +290,10 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 if(elements[i].empty()) continue;
                 string category;
                 if(i==0) category = "name";
-                else if(i == 1) category = "address";
-                else if(i == 2) category = "working_hours";
+                else if(i == 1) category = "city";
+                else if(i == 2) category = "street";
+                else if(i == 3) category = "house_number";
+                else if(i == 4) category = "working_hours";
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
@@ -303,8 +348,10 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 if(elements[i].empty()) continue;
                 string category;
                 if(i==0) category = "name";
-                else if(i == 1) category = "address";
-                else if(i == 2) category = "working_hours";
+                else if(i == 1) category = "city";
+                else if(i == 2) category = "street";
+                else if(i == 3) category = "house_number";
+                else if(i == 4) category = "working_hours";
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);
@@ -391,7 +438,8 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
             toClient.clear();
             cout << endl << query << endl;
             if (FindByCriteria(query, username)) {
-                ifstream finalFile("finalFile_" + username + ".tmp");
+                ChangeStoreNumber(username);
+                ifstream finalFile("finalFile_with_shops_" + username + ".tmp");
                 ostringstream oss;
                 oss << finalFile.rdbuf();
                 finalFile.close();
@@ -411,8 +459,10 @@ bool DBMS_Queries(int& clientSocket, string& command, ostringstream& toClient, s
                 if(elements[i].empty()) continue;
                 string category;
                 if(i==0) category = "name";
-                else if(i == 1) category = "address";
-                else if(i == 2) category = "working_hours";
+                else if(i == 1) category = "city";
+                else if(i == 2) category = "street";
+                else if(i == 3) category = "house_number";
+                else if(i == 4) category = "working_hours";
                 query += "shops." + category + " = '" + elements[i] + "' AND ";
             }
             query.erase(query.size() - 5);

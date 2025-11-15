@@ -23,6 +23,58 @@ const string logFileName = "server_log.txt";
 
 atomic<bool> running = true; 
 int serverSocket = -1;
+map<string, LoginAttempts> attemptsMap;
+mutex loginMutex;
+
+string GetMinuteEnding(int& minutes) {
+    int lastDigit = minutes % 10;
+    int lastTwoDigits = minutes % 100;
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 14)
+        return "минут";
+    if (lastDigit == 1)
+        return "минута";
+    if (lastDigit >= 2 && lastDigit <= 4)
+        return "минуты";
+    return "минут";
+}
+bool IsBlocked(const string& key, string& message) {
+    using namespace chrono;
+    lock_guard<mutex> lock(loginMutex);
+    auto& info = attemptsMap[key];
+    auto now = steady_clock::now();
+    if (now < info.blockedUntil) {
+        steady_clock::duration diff = info.blockedUntil - now;
+        int secLeft = duration_cast<seconds>(diff).count();
+        int minLeft = (secLeft + 59) / 60;
+        if (minLeft == 0) minLeft = 1;
+        message = "!Ваш аккаунт временно заблокирован. Подождите " 
+                  + to_string(minLeft) + GetMinuteEnding(minLeft);
+        Log("CLIENT " + key + " был заблокирован на 10 минут из-за превышения попыток входа");
+        return true;
+    }
+
+    return false;
+}
+
+void RegisterFailedAttempt(const string& key) {
+    using namespace chrono;
+
+    lock_guard<mutex> lock(loginMutex);
+    auto& info = attemptsMap[key];
+
+    info.attempts++;
+
+    if (info.attempts >= 2) {
+        info.blockedUntil = steady_clock::now() + minutes(10); 
+        info.attempts = 0;
+    }
+}
+
+void ResetAttempts(const string& key) {
+    lock_guard<mutex> lock(loginMutex);
+    attemptsMap[key] = LoginAttempts(); 
+}
+
 
 void Log(const string& message) {
     lock_guard<recursive_mutex> lock(GetFileMutex(logFileName));
